@@ -1,13 +1,11 @@
 use std::fs::*;
 use std::io::*;
 
-// const file: File = File::open("foo.txt").expect("unable to open file");
 
 fn main() {
-    let num = "54";
-    let addr: String = num.to_string();
-    let ret: String = get(addr);
-    println!("{}", ret)
+    let addr = "54";
+    let ret: String = get(addr.to_string());
+    println!("{}", ret);
 }
 
 fn get(addr: String) -> String{
@@ -26,7 +24,6 @@ fn get(addr: String) -> String{
         }
     }
     let message = "Unable to find your data";
-    let ret: String = message.to_string();
-    return ret;
+    return message.to_string();
 
 }
