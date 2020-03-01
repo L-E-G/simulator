@@ -1,79 +1,7 @@
 extern crate num;
 extern crate ux;
 
-use std::collections::HashMap;
-use std::hash::Hash;
-use std::default::Default;
-
-use num::Integer;
-use num::bounds::Bounded;
-
-use ux::{u1,u2};
-
-/// Represents unsigned integers which are smaller than 8 bits.
-/// To perform computations on the 
-struct SmallUInt {
-    // Number of bits.
-    size: usize,
-    
-    // Bits in little endian order.
-    bits: Vec<bool>,
-}
-
-impl SmallUInt {
-    /// Creates a SmallUInt from data. Only the first size bits of the u8 will
-    /// be used.
-    fn new(size: usize, data: u8) -> SmallUInt {
-        let data = data.to_le_bytes()[0];
-        let mut bits = Vec::<bool>::new();
-        
-        for i in 0..size {
-            bits.push(((data & (1 << i)) >> i) == 1);
-        }
-
-        SmallUInt{
-            size: size,
-            bits: bits,
-        }
-    }
-    
-    /// Converts to a u8 so operations can take place.
-    fn as_u8(&self) -> u8 {
-        let mut accum: u8 = 0;
-        
-        for i in 0..self.size {
-            accum |= (self.bits[i] as u8) << i;
-        }
-
-        accum
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    
-    #[test]
-    fn smalluint_new() {
-        let s0 = SmallUInt::new(8, 0);
-        assert_eq!(s0.size, 8);
-        assert_eq!(s0.bits, [false; 8]);
-
-        // 128 64 32 16 8 4 2 1
-        // 1   1  0  0  1 1 0 1   = 205
-        // ^ ignore ^  | ^ pack ^
-        let s5 = SmallUInt::new(4, 205);
-        assert_eq!(s5.size, 4);
-        assert_eq!(s5.bits, [true, false, true, true]);
-    }
-
-    #[test]
-    fn smalluint_as_u8() {
-        let s5 = SmallUInt::new(4, 205);
-        assert_eq!(s5.as_u8(), 13);
-    }
-}
-
+use ux::{u22};
 
 /// Indicates the status of a simulator operation with either a value, error, or
 /// result which will be available after a delay. D is the data type, E is the
@@ -89,7 +17,7 @@ enum SimResult<D, E> {
     /// simulator cycles before the value will be ready. The result will be
     /// available during the simulator cycle in which this field reaches 0. The
     /// second field is the result. This result can be OK, Err, or even Wait.
-    Wait(u16, Box<SimResult<D, E>>),
+    Wait(u16, D),
 }
 
 impl<D, E> SimResult<D, E> {
@@ -107,7 +35,7 @@ impl<D, E> SimResult<D, E> {
             SimResult::Err(e) => SimResult::Err(e),
             SimResult::Wait(i, res) => {
                 if i <= 2 {
-                    return *res;
+                    return SimResult::Ok(res);
                 }
 
                 SimResult::Wait(i-1, res)
@@ -116,112 +44,146 @@ impl<D, E> SimResult<D, E> {
     }
 }
 
-trait Address: Integer + Hash {}
-
 // Memory, A is the address type, D is the data type.
-trait Memory<A: Address, D> {
-    fn get(self, address: A) -> SimResult<D, String>;
-    fn set(self, address: A, data: D) -> SimResult<(), String>;
+trait Memory<A, D> {
+    fn get(&mut self, address: A) -> SimResult<D, String>;
+    fn set(&mut self, address: A, data: D) -> SimResult<(), String>;
 }
 
-// The 4-way associative cache will be ~64 KB large.
-// Each line will be 71 bits large:
-//     tag 2b, offset 1b, data1 32b, data2 32b, dirty 1b, LRU 2b, valid 1b
-// Each set will have 4 lines => 284 bits per set.
-// 64 KB / 284 bits ~= 1,802 sets
-// This means that the index will take 11 bits since log_2(1,802) = 10.5 so we
-// need 11 bits.
-const NUM_FOUR_WAY_ASSOC_CACHE_SETS: usize = 1802;
+const DM_CACHE_LINES: usize = 1024;
 
-// Mask which extracts 11 bits for index.
-// 0000 0000 0000 0000 0011 1111 1111 1000
-const FOUR_WAY_ASSOC_CACHE_ADDR_MASK: u32 = 0x3FF8;
-
-// Mask which extracts 2 bits for the tag.
-// 0000 0000 0000 0000 0000 0000 0000 0110
-const FOUR_WAY_ASSOC_CACHE_TAG_MASK: u32 = 0x6;
-
-// 4-ways associative cache. Contains sets. Each set is selected by an index.
-// Each set contains a number of lines, called ways.
-struct FourWayAssocCache<'a> {
-    sets: [FourWayAssocSet; NUM_FOUR_WAY_ASSOC_CACHE_SETS],
-
-    // Underlying memory used to service misses.
-    base: &'a dyn Memory<u32, u32>
+// Direct mapped cache.
+// 10 least significant bits of an address are the index.
+// 22 most significant bits of an address are the tag.
+struct DMCache<'a> {
+    delay: u16,
+    lines: [DMCacheLine; DM_CACHE_LINES],
+    base: &'a mut dyn Memory<u32, u32>,
 }
 
-struct FourWayAssocSet {
-    ways: [FourWayAssocLine; 4],
-}
-
-impl FourWayAssocSet {
-    fn new() -> FourWayAssocSet {
-        FourWayAssocSet{
-            ways: [FourWayAssocLine::new(), FourWayAssocLine::new(),
-                   FourWayAssocLine::new(), FourWayAssocLine::new()],
-        }
-    }
-}
-
-struct FourWayAssocLine {
-    tag: u2,
-    offset: u1,
-    data: [u32; 2],
-    dirty: bool,
-    lru: u2,
+#[derive(Copy,Clone)]
+struct DMCacheLine {
+    tag: u22,
+    data: u32,
     valid: bool,
+    dirty: bool,
 }
 
-impl FourWayAssocLine {
-    fn new() -> FourWayAssocLine {
-        FourWayAssocLine{
-            tag: 0,
-            offset: 0,
-            data: [0; 2],
-            dirty: false,
-            lru: 0,
+impl DMCacheLine {
+    fn new() -> DMCacheLine {
+        DMCacheLine{
+            tag: u22::new(0),
+            data: 0,
             valid: false,
+            dirty: false,
         }
     }
 }
 
-impl<'a> FourWayAssocCache<'a> {
-    // Creates an AssocMem, errors if the address type cannot represent the
-    fn new(nsets: u8, nways: u8, base: &'a dyn Memory<u32, u32>)
-           -> FourWayAssocCache<'a> {
-        let mut sets: [FourWayAssocSet; NUM_FOUR_WAY_ASSOC_CACHE_SETS];
-        for i in 0..NUM_FOUR_WAY_ASSOC_CACHE_SETS {
-            sets[i] = FourWayAssocSet::new();
-        }
-        
-        FourWayAssocCache{
-            sets: sets,
+impl<'a> DMCache<'a> {
+    fn new(delay: u16, base: &'a mut dyn Memory<u32, u32>) -> DMCache {
+        let lines = [DMCacheLine::new(); DM_CACHE_LINES];
+
+        DMCache{
+            delay: delay,
+            lines: lines,
             base: base,
         }
     }
 }
 
-impl<'a> Memory for FourWayAssocCache {
-    fn get(&self, address: u32) -> SimResult<u32, String> {
-        // Get set for index
-        let idx = (address & FOUR_WAY_ASSOC_CACHE_ADDR_MASK) >> 3;
-        let set = self.sets[idx];
+impl<'a> Memory<u32, u32> for DMCache<'a> {
+    fn get(&mut self, address: u32) -> SimResult<u32, String> {
+        // Get line
+        let idx = ((address << 22) >> 22) as usize;
+        let tag: u22 = u22::new(address >> 10);
 
-        // Get tag bits
-        let tag: u2 = (address & FOUR_WAY_ASSOC_CACHE_TAG_MASK) >> 1;
+        let line = self.lines[idx];
 
-        // Try to find way with tag
-        for i in 0..4 {
-            if set.ways[i].valid && set.ways[i].tag == tag {
-                
+        // Check if address in cache
+        if line.valid && line.tag == tag {
+            SimResult::Wait(self.delay, line.data)
+        } else {
+            let mut total_wait: u16 = self.delay;
+            
+            // Evict current line if dirty and there is a conflict
+            if line.valid && line.tag != tag && line.dirty {
+                // Write to cache layer below
+                let evict_res = self.base.set(address, line.data);
+
+                if let SimResult::Err(e) = evict_res {
+                    return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
+                }
+
+                if let SimResult::Wait(c, _r) = evict_res {
+                    total_wait += c;
+                }
             }
+
+            // Get value from cache layer below
+            let get_res = self.base.get(address);
+
+            let data = match get_res {
+                SimResult::Ok(d) => d,
+                SimResult::Err(e) => {
+                    return SimResult::Err(format!("failed to get line value from base cache: {}", e));
+                },
+                SimResult::Wait(w, d) => {
+                    total_wait += w;
+                    
+                    d
+                }
+            };
+
+            // Save in cache
+            self.lines[idx].dirty = false;
+            self.lines[idx].tag = tag;
+            self.lines[idx].data = data;
+
+            SimResult::Wait(total_wait, data)
         }
     }
     
-    fn set(&self, address: u32, data: u32) -> SimResult<(), String> {
+    fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
+        // Get line
+        let idx = ((address << 22) >> 22) as usize;
+        let tag: u22 = u22::new(address >> 10);
+
+        let line = self.lines[idx];
+
+        // If line matches address
+        if line.valid && line.tag == tag {
+            self.lines[idx].dirty = true;
+            self.lines[idx].data = data;
+
+            SimResult::Wait(self.delay, ())
+        } else {
+            let mut total_wait: u16 = self.delay;
+            
+            // Evict current line if dirty and there is a conflict
+            if line.valid && line.tag != tag && line.dirty {
+                // Write to cache layer below
+                let evict_res = self.base.set(address, line.data);
+
+                if let SimResult::Err(e) = evict_res {
+                    return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
+                }
+
+                if let SimResult::Wait(c, _r) = evict_res {
+                    total_wait += c;
+                }
+            }
+
+            // Save in cache
+            self.lines[idx].dirty = false;
+            self.lines[idx].tag = tag;
+            self.lines[idx].data = data;
+
+            SimResult::Wait(total_wait, ())
+        }
     }
 }
 
 fn main() {
-    println!("Hello, world!");
+    
 }
