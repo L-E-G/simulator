@@ -1,7 +1,13 @@
-extern crate num;
 extern crate ux;
+extern crate text_io;
+
+use std::io;
+use std::io::Write;
+use std::process::exit;
+use std::collections::HashMap;
 
 use ux::{u22};
+use text_io::scan;
 
 /// Indicates the status of a simulator operation with either a value, error, or
 /// result which will be available after a delay. D is the data type, E is the
@@ -48,6 +54,37 @@ impl<D, E> SimResult<D, E> {
 trait Memory<A, D> {
     fn get(&mut self, address: A) -> SimResult<D, String>;
     fn set(&mut self, address: A, data: D) -> SimResult<(), String>;
+}
+
+struct DRAM {
+    delay: u16,
+    data: HashMap<u32, u32>,
+}
+
+impl DRAM {
+    fn new(delay: u16) -> DRAM {
+        DRAM{
+            delay: delay,
+            data: HashMap::new(),
+        }
+    }
+}
+
+impl Memory<u32, u32> for DRAM {
+    fn get(&mut self, address: u32) -> SimResult<u32, String> {
+        match self.data.get(&address) {
+            Some(d) => SimResult::Wait(self.delay, *d),
+            None => {
+                self.data.insert(address, 0);
+                SimResult::Wait(self.delay, 0)
+            }
+        }
+    }
+    
+    fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
+        self.data.insert(address, data);
+        SimResult::Wait(self.delay, ())
+    }
 }
 
 const DM_CACHE_LINES: usize = 1024;
@@ -184,6 +221,85 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
     }
 }
 
+fn help() {
+    println!("Commands:
+
+- exit(): Exit program
+- help(): Show this help text
+- get(address): Load address from memory
+- set(address, data): Write data to address in memory
+- show(level, address): Show an address's cache line, level can be: L1, L2, L3, DRAM");
+}
+
 fn main() {
+    let mut dram = DRAM::new(100);
+    let mut cache = DMCache::new(4, &mut dram);
+
+    let mut memory: &mut dyn Memory<u32, u32> = &mut cache;
     
+    help();
+    
+    loop {
+        print!("> ");
+        io::stdout().flush().expect("failed to flush stdout");
+        
+        let cmd: String;
+        let operands: String;
+        scan!("{}({})\n", cmd, operands);
+
+        match cmd.as_str() {
+            "get" => {
+                // Parse operands
+                let address: u32;
+                scan!(operands.bytes() => "{}", address);
+
+                // Perform operation
+                match memory.get(address) {
+                    SimResult::Ok(v) => {
+                        println!("Completed in 0 cycles");
+                        println!("{}: {}", address, v);
+                    },
+                    SimResult::Err(e) => eprintln!("Failed to get {}: {}", address, e),
+                    SimResult::Wait(c, v) => {
+                        println!("Completed in {} cycles", c);
+                        println!("{}: {}", address, v);
+                    }
+                };
+            },
+            "set" => {
+                // Parse operands
+                let address: u32;
+                let data: u32;
+                scan!(operands.bytes() => "{}, {}", address, data);
+
+                // Perform operation
+                match memory.set(address, data) {
+                    SimResult::Ok(_v) => {
+                        println!("Completed in 0 cycles");
+                    },
+                    SimResult::Err(e) => eprintln!("Failed to set {}: {}", address, e),
+                    SimResult::Wait(c, _v) => {
+                        println!("Completed in {} cycles", c);
+                    }
+                };
+            },
+            "show" => {
+                // Parse operands
+                let level: String;
+                let address: u32;
+                scan!(operands.bytes() => "{}, {}", level, address);
+
+                // TODO: Check level
+                // TODO: Display
+            },
+            "help" => help(),
+            "exit" => {
+                exit(0);
+            },
+            _ => {
+                eprintln!("Invalid command: {}", cmd);
+                eprintln!("Use help() command to see valid commands");
+            }
+        }
+    }
 }
