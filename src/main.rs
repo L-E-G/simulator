@@ -9,7 +9,6 @@ use std::cell::RefCell;
 use std::rc::Rc;
 //use std::borrow::BorrowMut;
 
-use ux::{u22};
 use text_io::scan;
 
 /// Indicates the status of a simulator operation with either a value, error, or
@@ -111,19 +110,21 @@ impl Memory<u32, u32> for DRAM {
 const DM_CACHE_LINES: usize = 1024;
 
 // Direct mapped cache.
+// 2 least significant bits are offset
 // 10 least significant bits of an address are the index.
-// 22 most significant bits of an address are the tag.
+// 20 most significant bits of an address are the tag.
 struct DMCache {
     delay: u16,
     lines: [DMCacheLine; DM_CACHE_LINES],
     base: Rc<RefCell<dyn Memory<u32, u32>>>,
-//    base: &'a mut dyn Memory<u32, u32>,
 }
+
+const DM_CACHE_LINE_LENGTH: usize = 4;
 
 #[derive(Copy,Clone)]
 struct DMCacheLine {
-    tag: u22,
-    data: u32,
+    tag: u32,
+    data: [u32; DM_CACHE_LINE_LENGTH],
     valid: bool,
     dirty: bool,
 }
@@ -131,8 +132,8 @@ struct DMCacheLine {
 impl DMCacheLine {
     fn new() -> DMCacheLine {
         DMCacheLine{
-            tag: u22::new(0),
-            data: 0,
+            tag: 0,
+            data: [0; DM_CACHE_LINE_LENGTH],
             valid: false,
             dirty: false,
         }
@@ -150,8 +151,10 @@ impl DMCache {
         }
     }
 
+    // TODO: write get_address_offset
+    // TODO: Modify get_address_{index,tag} to account for offet
     fn get_address_index(&self, address: u32) -> usize {
-        ((address << 22) >> 22) as usize
+        ((address << 20) >> 20) as usize
     }
 
     fn get_address_tag(&self, address: u32) -> u22 {
