@@ -249,7 +249,6 @@ impl Memory<u32, u32> for DMCache {
                 // Write to cache layer below
                 let old_addr = (u32::from(line.tag) << 10) | (idx as u32);
                 let evict_res = self.base.borrow_mut().set(old_addr, line.data);
-                println!("DMCache.set evicted {}={}", old_addr, line.data);
 
                 if let SimResult::Err(e) = evict_res {
                     return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
@@ -283,7 +282,9 @@ fn help() {
 
 fn main() {
     let dram = Rc::new(RefCell::new(DRAM::new(100)));
-    let l1_cache = Rc::new(RefCell::new(DMCache::new(4, dram.clone())));
+    let l3_cache = Rc::new(RefCell::new(DMCache::new(11, dram.clone())));
+    let l2_cache = Rc::new(RefCell::new(DMCache::new(38, l3_cache.clone())));
+    let l1_cache = Rc::new(RefCell::new(DMCache::new(4, l2_cache.clone())));
 
     let memory = &l1_cache;
     
@@ -342,8 +343,8 @@ fn main() {
 
                 let inspect_res = match level.as_str() {
                     "L1" => l1_cache.borrow().inspect_address_txt(address),
-                    "L2" => Err(String::from("Not implemented")),
-                    "L3" => Err(String::from("Not implemented")),
+                    "L2" => l2_cache.borrow().inspect_address_txt(address),
+                    "L3" => l3_cache.borrow().inspect_address_txt(address),
                     "DRAM" => dram.borrow().inspect_address_txt(address),
                     _ => Err(format!("Cache level name \"{}\" not recognized",
                                      level)),
