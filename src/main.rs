@@ -281,10 +281,11 @@ fn help() {
 }
 
 fn main() {
+    // TODO: line length 4
     let dram = Rc::new(RefCell::new(DRAM::new(100)));
-    let l3_cache = Rc::new(RefCell::new(DMCache::new(11, dram.clone())));
-    let l2_cache = Rc::new(RefCell::new(DMCache::new(38, l3_cache.clone())));
-    let l1_cache = Rc::new(RefCell::new(DMCache::new(4, l2_cache.clone())));
+    let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
+    let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
+    let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
 
     let memory = &l1_cache;
     
