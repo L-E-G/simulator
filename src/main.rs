@@ -69,7 +69,7 @@ impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: File::create("dram.txt").expect("Unable to create dram"),
+            data: File::open("src/dram").expect("Unable to create dram"),
         }
     }
 }
@@ -85,9 +85,9 @@ impl Memory<u32, u32> for DRAM {
             let line = &line.unwrap();
             let data: Vec<&str> = line.split(" ").collect();
 
-            let naddr: u32 = FromStr::from_str(data[1]).unwrap();
+            let naddr: u32 = FromStr::from_str(data[0]).unwrap();
             let ntag: u32 = FromStr::from_str(data[0]).unwrap();
-            let ndata: u32 = FromStr::from_str(data[2]).unwrap();
+            let ndata: u32 = FromStr::from_str(data[1]).unwrap();
 
             if address == naddr {
                 return SimResult::Wait(self.delay, ndata);
