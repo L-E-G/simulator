@@ -5,6 +5,9 @@ use std::io;
 use std::io::Write;
 use std::process::exit;
 use std::collections::HashMap;
+use std::cell::RefCell;
+use std::rc::Rc;
+//use std::borrow::BorrowMut;
 
 use ux::{u22};
 use text_io::scan;
@@ -56,6 +59,13 @@ trait Memory<A, D> {
     fn set(&mut self, address: A, data: D) -> SimResult<(), String>;
 }
 
+// InspectableMemory allows a memory unit to be insepcted for user
+// interface purposes. A is the address type.
+trait InspectableMemory<A> {
+    // Returns a text description of an address.
+    fn inspect_address_txt(&self, address: A) -> Result<String, String>;
+}
+
 struct DRAM {
     delay: u16,
     data: HashMap<u32, u32>,
@@ -66,6 +76,17 @@ impl DRAM {
         DRAM{
             delay: delay,
             data: HashMap::new(),
+        }
+    }
+}
+
+impl InspectableMemory<u32> for DRAM {
+    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+        match self.data.get(&address) {
+            Some(d) => Ok(format!("\
+Address: {}
+Value  : {}", address, *d)),
+            None => Ok(format!("Does not exist")),
         }
     }
 }
@@ -92,10 +113,11 @@ const DM_CACHE_LINES: usize = 1024;
 // Direct mapped cache.
 // 10 least significant bits of an address are the index.
 // 22 most significant bits of an address are the tag.
-struct DMCache<'a> {
+struct DMCache {
     delay: u16,
     lines: [DMCacheLine; DM_CACHE_LINES],
-    base: &'a mut dyn Memory<u32, u32>,
+    base: Rc<RefCell<dyn Memory<u32, u32>>>,
+//    base: &'a mut dyn Memory<u32, u32>,
 }
 
 #[derive(Copy,Clone)]
@@ -117,8 +139,8 @@ impl DMCacheLine {
     }
 }
 
-impl<'a> DMCache<'a> {
-    fn new(delay: u16, base: &'a mut dyn Memory<u32, u32>) -> DMCache {
+impl DMCache {
+    fn new(delay: u16, base: Rc<RefCell<dyn Memory<u32, u32>>>) -> DMCache {
         let lines = [DMCacheLine::new(); DM_CACHE_LINES];
 
         DMCache{
@@ -127,13 +149,37 @@ impl<'a> DMCache<'a> {
             base: base,
         }
     }
+
+    fn get_address_index(&self, address: u32) -> usize {
+        ((address << 22) >> 22) as usize
+    }
+
+    fn get_address_tag(&self, address: u32) -> u22 {
+        u22::new(address >> 10)
+    }
 }
 
-impl<'a> Memory<u32, u32> for DMCache<'a> {
+impl InspectableMemory<u32> for DMCache {
+    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+        let idx = self.get_address_index(address);
+
+        let line = self.lines[idx];
+
+        Ok(format!("\
+Index: {}
+Tag  : {}
+Data : {}
+Valid: {}
+Dirty: {}", idx,
+                   line.tag, line.data, line.valid, line.dirty))
+    }
+}
+
+impl Memory<u32, u32> for DMCache {
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
         // Get line
-        let idx = ((address << 22) >> 22) as usize;
-        let tag: u22 = u22::new(address >> 10);
+        let idx = self.get_address_index(address);
+        let tag: u22 = self.get_address_tag(address);
 
         let line = self.lines[idx];
 
@@ -146,7 +192,7 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
             // Evict current line if dirty and there is a conflict
             if line.valid && line.tag != tag && line.dirty {
                 // Write to cache layer below
-                let evict_res = self.base.set(address, line.data);
+                let evict_res = self.base.borrow_mut().set(address, line.data);
 
                 if let SimResult::Err(e) = evict_res {
                     return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
@@ -158,7 +204,7 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
             }
 
             // Get value from cache layer below
-            let get_res = self.base.get(address);
+            let get_res = self.base.borrow_mut().get(address);
 
             let data = match get_res {
                 SimResult::Ok(d) => d,
@@ -173,6 +219,7 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
             };
 
             // Save in cache
+            self.lines[idx].valid = true;
             self.lines[idx].dirty = false;
             self.lines[idx].tag = tag;
             self.lines[idx].data = data;
@@ -183,8 +230,8 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
     
     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
         // Get line
-        let idx = ((address << 22) >> 22) as usize;
-        let tag: u22 = u22::new(address >> 10);
+        let idx = self.get_address_index(address);
+        let tag: u22 = self.get_address_tag(address);
 
         let line = self.lines[idx];
 
@@ -200,7 +247,9 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
             // Evict current line if dirty and there is a conflict
             if line.valid && line.tag != tag && line.dirty {
                 // Write to cache layer below
-                let evict_res = self.base.set(address, line.data);
+                let old_addr = (u32::from(line.tag) << 10) | (idx as u32);
+                let evict_res = self.base.borrow_mut().set(old_addr, line.data);
+                println!("DMCache.set evicted {}={}", old_addr, line.data);
 
                 if let SimResult::Err(e) = evict_res {
                     return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
@@ -212,7 +261,8 @@ impl<'a> Memory<u32, u32> for DMCache<'a> {
             }
 
             // Save in cache
-            self.lines[idx].dirty = false;
+            self.lines[idx].valid = true;
+            self.lines[idx].dirty = true;
             self.lines[idx].tag = tag;
             self.lines[idx].data = data;
 
@@ -232,13 +282,13 @@ fn help() {
 }
 
 fn main() {
-    let mut dram = DRAM::new(100);
-    let mut cache = DMCache::new(4, &mut dram);
+    let dram = Rc::new(RefCell::new(DRAM::new(100)));
+    let l1_cache = Rc::new(RefCell::new(DMCache::new(4, dram.clone())));
 
-    let mut memory: &mut dyn Memory<u32, u32> = &mut cache;
+    let memory = &l1_cache;
     
     help();
-    
+
     loop {
         print!("> ");
         io::stdout().flush().expect("failed to flush stdout");
@@ -254,7 +304,7 @@ fn main() {
                 scan!(operands.bytes() => "{}", address);
 
                 // Perform operation
-                match memory.get(address) {
+                match memory.borrow_mut().get(address) {
                     SimResult::Ok(v) => {
                         println!("Completed in 0 cycles");
                         println!("{}: {}", address, v);
@@ -273,11 +323,12 @@ fn main() {
                 scan!(operands.bytes() => "{}, {}", address, data);
 
                 // Perform operation
-                match memory.set(address, data) {
+                match memory.borrow_mut().set(address, data) {
                     SimResult::Ok(_v) => {
                         println!("Completed in 0 cycles");
                     },
-                    SimResult::Err(e) => eprintln!("Failed to set {}: {}", address, e),
+                    SimResult::Err(e) => eprintln!("Failed to set {}: {}",
+                                                   address, e),
                     SimResult::Wait(c, _v) => {
                         println!("Completed in {} cycles", c);
                     }
@@ -289,8 +340,25 @@ fn main() {
                 let address: u32;
                 scan!(operands.bytes() => "{}, {}", level, address);
 
-                // TODO: Check level
-                // TODO: Display
+                let inspect_res = match level.as_str() {
+                    "L1" => l1_cache.borrow().inspect_address_txt(address),
+                    "L2" => Err(String::from("Not implemented")),
+                    "L3" => Err(String::from("Not implemented")),
+                    "DRAM" => dram.borrow().inspect_address_txt(address),
+                    _ => Err(format!("Cache level name \"{}\" not recognized",
+                                     level)),
+                };
+
+                match inspect_res {
+                    Ok(txt) => {
+                        println!("{} at {}", level, address);
+                        println!("{}", txt);
+                    },
+                    Err(e) => {
+                        eprintln!("Failed to inspect {} at {}: {}", level, address,
+                                  e);
+                    }
+                };
             },
             "help" => help(),
             "exit" => {
