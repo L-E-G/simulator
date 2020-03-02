@@ -3,8 +3,12 @@ extern crate text_io;
 
 use std::io;
 use std::io::Write;
+use std::fs::File;
 use std::process::exit;
-use std::collections::HashMap;
+use std::str::FromStr;
+use std::io::LineWriter;
+use std::io::BufReader;
+use std::io::BufRead;
 
 use ux::{u22};
 use text_io::scan;
@@ -58,32 +62,63 @@ trait Memory<A, D> {
 
 struct DRAM {
     delay: u16,
-    data: HashMap<u32, u32>,
+    data: File,
 }
 
 impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: HashMap::new(),
+            data: File::create("dram.txt").expect("Unable to create dram"),
         }
     }
 }
 
 impl Memory<u32, u32> for DRAM {
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        match self.data.get(&address) {
-            Some(d) => SimResult::Wait(self.delay, *d),
-            None => {
-                self.data.insert(address, 0);
-                SimResult::Wait(self.delay, 0)
+        // let mut file = self.data;
+        let reader = BufReader::new(&self.data);
+
+        let tag: u22 = u22::new(address >> 10);
+
+        for (index, line) in reader.lines().enumerate() {
+            let line = &line.unwrap();
+            let data: Vec<&str> = line.split(" ").collect();
+
+            let naddr: u32 = FromStr::from_str(data[1]).unwrap();
+            let ntag: u32 = FromStr::from_str(data[0]).unwrap();
+            let ndata: u32 = FromStr::from_str(data[2]).unwrap();
+
+            if address == naddr {
+                return SimResult::Wait(self.delay, ndata);
             }
         }
+
+        return SimResult::Wait(self.delay, 0);
+
     }
     
     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
-        self.data.insert(address, data);
-        SimResult::Wait(self.delay, ())
+
+        // let mut file = File::create("dram");
+        let mut file = &self.data;
+        let reader = BufReader::new(file);
+        let mut file2 = &self.data;
+        // let mut file2 = File::create("mem");
+        let mut buffer = LineWriter::new(file2);
+
+        let tag: u22 = u22::new(address >> 10);
+
+        for (index, line) in reader.lines().enumerate() {
+            let line = &line.unwrap();
+
+            buffer.write_all(line.as_bytes());
+        }
+
+        buffer.write_all( format!("{} {} {}\n", tag.to_string(), address.to_string(), data.to_string()).as_bytes() ).expect("failed to write");
+        buffer.flush();
+
+        return SimResult::Wait(self.delay, ())
     }
 }
 
@@ -235,7 +270,7 @@ fn main() {
     let mut dram = DRAM::new(100);
     let mut cache = DMCache::new(4, &mut dram);
 
-    let mut memory: &mut dyn Memory<u32, u32> = &mut cache;
+    let mut memory: &mut dyn Memory<u32, u32> = &mut dram;
     
     help();
     
