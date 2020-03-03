@@ -1,14 +1,16 @@
 extern crate ux;
 extern crate text_io;
+extern crate bincode;
+extern crate serde;
 
 use std::io;
 use std::io::Write;
 use std::fs::File;
 use std::process::exit;
 use std::str::FromStr;
-use std::io::LineWriter;
-use std::io::BufReader;
-use std::io::BufRead;
+
+use serde::{Serialize,Deserialize,Serializer};
+use crate::serde::ser::SerializeStruct;
 
 use ux::{u22};
 use text_io::scan;
@@ -65,32 +67,43 @@ struct DRAM {
     data: File,
 }
 
+#[derive(Serialize,Deserialize)]
+struct DRAMLine {
+    tag: u32,
+    valid: bool,
+    data: u32,
+}
+
 impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: File::open("src/dram").expect("Unable to create dram"),
+            data: File::create("src/dram").expect("Unable to create dram"),
+        }
+    }
+}
+
+impl DRAMLine {
+    fn new(tag: u32, data: u32) -> DRAMLine{
+        DRAMLine{
+            tag: tag,
+            valid: true,
+            data: data,
         }
     }
 }
 
 impl Memory<u32, u32> for DRAM {
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        // let mut file = self.data;
-        let reader = BufReader::new(&self.data);
+        let mut file = &self.data;
 
-        let tag: u22 = u22::new(address >> 10);
+        let tag: u32 = (address >> 10) << 10;
+        let mut vec: Vec<DRAMLine> = bincode::deserialize_from(file).expect("Bad");
 
-        for (index, line) in reader.lines().enumerate() {
-            let line = &line.unwrap();
-            let data: Vec<&str> = line.split(" ").collect();
-
-            let naddr: u32 = FromStr::from_str(data[0]).unwrap();
-            let ntag: u32 = FromStr::from_str(data[0]).unwrap();
-            let ndata: u32 = FromStr::from_str(data[1]).unwrap();
-
-            if address == naddr {
-                return SimResult::Wait(self.delay, ndata);
+        for i in 0..vec.len() {
+            let line: &DRAMLine = vec.get(i).unwrap();
+            if line.tag == tag && line.valid {
+                return SimResult::Wait(self.delay, line.data);
             }
         }
 
@@ -100,23 +113,23 @@ impl Memory<u32, u32> for DRAM {
     
     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
 
-        // let mut file = File::create("dram");
         let mut file = &self.data;
-        let reader = BufReader::new(file);
-        let mut file2 = &self.data;
-        // let mut file2 = File::create("mem");
-        let mut buffer = LineWriter::new(file2);
 
-        let tag: u22 = u22::new(address >> 10);
+        // let mut initvec: Vec<DRAMLine> = Vec::new();
+        let mut zero: DRAMLine = DRAMLine::new(0,0);
+        // initvec.push(zero);
+        bincode::serialize_into(file, &zero);
 
-        for (index, line) in reader.lines().enumerate() {
-            let line = &line.unwrap();
+        // let tag: u22 = u22::new(address >> 10);
+        let tag: u32 = (address >> 10) << 10;
 
-            buffer.write_all(line.as_bytes());
-        }
+        let mut lineToSet = DRAMLine::new(tag, data);
+        // let mut vec: Vec<DRAMLine> = bincode::deserialize_from(file).expect("Nope");
+        let z: DRAMLine = bincode::deserialize_from(file).expect("Bad");  //THIS IS NOT WORKING, AND I DONT KNOW WHY
+        println!("{}",z.tag);
+        // vec.push(lineToSet);
+        // bincode::serialize_into(file, &vec);
 
-        buffer.write_all( format!("{} {} {}\n", tag.to_string(), address.to_string(), data.to_string()).as_bytes() ).expect("failed to write");
-        buffer.flush();
 
         return SimResult::Wait(self.delay, ())
     }
