@@ -24,32 +24,8 @@ enum SimResult<D, E> {
     /// Indicates result is not available yet. First field is the number of
     /// simulator cycles before the value will be ready. The result will be
     /// available during the simulator cycle in which this field reaches 0. The
-    /// second field is the result. This result can be OK, Err, or even Wait.
+    /// second field is the result.
     Wait(u16, D),
-}
-
-impl<D, E> SimResult<D, E> {
-    /// Decrements the cycle count in a Wait. If this field equals 1 after
-    /// decrementing then the contained result is returned. The contained result is
-    /// returned when the count equals 1, not 0, because this method is expected to
-    /// be called once every cycle. The value which is returned should be processed
-    /// in the next cycle, when the count would equal 0.
-    ///
-    /// Otherwise a Wait with a decremented cycle count is returned. If the
-    /// SimResult is Ok or Err just returns, method should not be used on these.
-    fn process(self) -> SimResult<D, E> {
-        match self {
-            SimResult::Ok(v) => SimResult::Ok(v),
-            SimResult::Err(e) => SimResult::Err(e),
-            SimResult::Wait(i, res) => {
-                if i <= 2 {
-                    return SimResult::Ok(res);
-                }
-
-                SimResult::Wait(i-1, res)
-            },
-        }
-    }
 }
 
 // Memory, A is the address type, D is the data type.
@@ -110,8 +86,8 @@ impl Memory<u32, u32> for DRAM {
 const DM_CACHE_LINES: usize = 1024;
 
 // Direct mapped cache.
-// 2 least significant bits are offset
-// 10 least significant bits of an address are the index.
+// 2 least significant bits are offset.
+// 10 next least significant bits of an address are the index.
 // 20 most significant bits of an address are the tag.
 struct DMCache {
     delay: u16,
@@ -151,18 +127,21 @@ impl DMCache {
         }
     }
 
-    // TODO: write get_address_offset
-    // TODO: Modify get_address_{index,tag} to account for offet
-    fn get_address_index(&self, address: u32) -> usize {
-        ((address << 20) >> 20) as usize
+    fn get_address_offset(&self, address: u32) -> usize {
+        (address & 3) as usize
     }
 
+    fn get_address_index(&self, address: u32) -> usize {
+        ((address & 0xFFC) >> 2) as usize
+    }
+    
     fn get_address_tag(&self, address: u32) -> u22 {
-        u22::new(address >> 10)
+        u22::new(address >> 12)
     }
 }
 
 impl InspectableMemory<u32> for DMCache {
+    // TODO: Make DMCache.inspect_address_txt show offset
     fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
         let idx = self.get_address_index(address);
 
@@ -179,6 +158,7 @@ Dirty: {}", idx,
 }
 
 impl Memory<u32, u32> for DMCache {
+    // TODO: Make DMCache.{get,set} use offset
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
         // Get line
         let idx = self.get_address_index(address);
