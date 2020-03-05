@@ -15,16 +15,12 @@ use text_io::scan;
 /// result which will be available after a delay. D is the data type, E is the
 /// error type.
 enum SimResult<D, E> {
-    /// Value if operation was successful.
-    Ok(D),
-
     /// Error if operation failed.
     Err(E),
 
-    /// Indicates result is not available yet. First field is the number of
-    /// simulator cycles before the value will be ready. The result will be
-    /// available during the simulator cycle in which this field reaches 0. The
-    /// second field is the result.
+    /// Indicates result is not yet available but was successful. First field is
+    /// the number of simulator cycles before the value will be ready. The value of
+    /// 0 indicates the result is ready. The second field is the value.
     Wait(u16, D),
 }
 
@@ -160,16 +156,18 @@ Dirty: {}", idx,
 impl Memory<u32, u32> for DMCache {
     // TODO: Make DMCache.{get,set} use offset
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        // Get line
+        // Extract components from address
         let idx = self.get_address_index(address);
-        let tag: u22 = self.get_address_tag(address);
+        let tag = self.get_address_tag(address);
+        let offset = self.get_address_offset(address);
 
         let line = self.lines[idx];
 
-        // Check if address in cache
+        // Cache hit
         if line.valid && line.tag == tag {
-            SimResult::Wait(self.delay, line.data)
-        } else {
+            SimResult::Wait(self.delay, line.data[offset])
+        } else { // Cache miss
+            // Record total cycles used in servicing miss
             let mut total_wait: u16 = self.delay;
             
             // Evict current line if dirty and there is a conflict
@@ -178,7 +176,7 @@ impl Memory<u32, u32> for DMCache {
                 let evict_res = self.base.borrow_mut().set(address, line.data);
 
                 if let SimResult::Err(e) = evict_res {
-                    return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
+                    return SimResult::Err(format!("failed to write out conflicting line when evicting: {}", e));
                 }
 
                 if let SimResult::Wait(c, _r) = evict_res {
@@ -186,11 +184,12 @@ impl Memory<u32, u32> for DMCache {
                 }
             }
 
+            // TODO: make DMCache.get miss logic use offset
+
             // Get value from cache layer below
             let get_res = self.base.borrow_mut().get(address);
 
             let data = match get_res {
-                SimResult::Ok(d) => d,
                 SimResult::Err(e) => {
                     return SimResult::Err(format!("failed to get line value from base cache: {}", e));
                 },
@@ -290,11 +289,8 @@ fn main() {
 
                 // Perform operation
                 match memory.borrow_mut().get(address) {
-                    SimResult::Ok(v) => {
-                        println!("Completed in 0 cycles");
-                        println!("{}: {}", address, v);
-                    },
-                    SimResult::Err(e) => eprintln!("Failed to get {}: {}", address, e),
+                    SimResult::Err(e) => eprintln!("Failed to get {}: {}",
+                                                   address, e),
                     SimResult::Wait(c, v) => {
                         println!("Completed in {} cycles", c);
                         println!("{}: {}", address, v);
@@ -309,9 +305,6 @@ fn main() {
 
                 // Perform operation
                 match memory.borrow_mut().set(address, data) {
-                    SimResult::Ok(_v) => {
-                        println!("Completed in 0 cycles");
-                    },
                     SimResult::Err(e) => eprintln!("Failed to set {}: {}",
                                                    address, e),
                     SimResult::Wait(c, _v) => {
