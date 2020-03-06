@@ -6,14 +6,15 @@ use std::io::Write;
 use std::process::exit;
 use std::cell::RefCell;
 use std::rc::Rc;
-//use std::borrow::BorrowMut;
+use std::cmp::PartialEq;
+use std::fmt::{Debug,Display};
 
 use text_io::scan;
 
 /// Indicates the status of a simulator operation with either a value, error, or
 /// result which will be available after a delay. D is the data type, E is the
 /// error type.
-enum SimResult<D, E> {
+enum SimResult<D, E: Display> {
     /// Error if operation failed.
     Err(E),
 
@@ -21,6 +22,16 @@ enum SimResult<D, E> {
     /// the number of simulator cycles before the value will be ready. A value of
     /// 0 indicates the result is ready. The second field is the value.
     Wait(u16, D),
+}
+
+impl<D, E: Display> SimResult<D, E> {
+    /// Panics if Err, otherwise returns Wait fields.
+    fn unwrap(self, panic_msg: &str) -> (u16, D) {
+        match self {
+            SimResult::Err(e) => panic!(format!("{}: {}", panic_msg, e)),
+            SimResult::Wait(c, d) => (c, d),
+        }
+    }
 }
 
 /// Memory provides an interface to access a memory struct, A is the address type,
@@ -61,7 +72,7 @@ struct DRAM {
 }
 
 /// Entry in the DRAM data_table.
-#[derive(Clone,Copy)]
+#[derive(Clone,Copy,PartialEq,Debug)]
 struct DRAMDataTableEntry {
     /// First address in memory region, inclusive.
     start_address: u32,
@@ -125,7 +136,7 @@ impl InspectableMemory<u32> for DRAM {
         
         // Find route_table entry
         let value = match self.data_table_entry(trimmed_address) {
-            Some((entry, entry_idx)) => {
+            Some((entry, _entry_idx)) => {
                 self.data[entry.data_index + (address as usize)]
             },
             None => {
@@ -206,12 +217,13 @@ impl Memory<u32, [u32; CACHE_LINE_LEN]> for DRAM {
 
         while modify_idx < self.data_table.len() - 1 {
             let entry = self.data_table[modify_idx];
-            let next_entry = self.data_table[modify_idx];
+            let next_entry = self.data_table[modify_idx + 1];
 
             if (entry.start_address + entry.length) == next_entry.start_address {
-                self.data_table.remove(modify_idx);
+                self.data_table[modify_idx].length = next_entry.length;
+                self.data_table.remove(modify_idx + 1);
             }
-            
+
             modify_idx += 1;
         }
 
@@ -514,4 +526,42 @@ fn main() {
             }
         }
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_dram_data_table_entries() {
+        let mut dram = DRAM::new(100);
+
+        // Ensure data_table entries are created for 2 addresses far apart
+        const ADDR_A: u32 = 5;
+        const VAL_A: [u32; 4] = [6; 4];
+        
+        const ADDR_B: u32 = 500;
+        const VAL_B: [u32; 4] = [666; 4];
+        
+        dram.set(ADDR_A, VAL_A).unwrap("Failed to set a");
+        dram.set(ADDR_B, VAL_B).unwrap("Failed to set b");
+
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
+            start_address: ADDR_A >> 2,
+            data_index: 0,
+            length: 1,
+        }, "Data table entry for A");
+        assert_eq!(dram.data_table[1], DRAMDataTableEntry{
+            start_address: ADDR_B >> 2,
+            data_index: 1,
+            length: 1,
+        }, "Data table entry for B");
+
+        assert_eq!(dram.get(ADDR_A).unwrap("Failed to get a").1, VAL_A,
+                   "Value for A");
+        assert_eq!(dram.get(ADDR_B).unwrap("Failed to get b").1, VAL_B,
+                   "Value for B");
+    }
+
+    // TODO: Write data_table coalesce test, write insert in middle of range test
 }
