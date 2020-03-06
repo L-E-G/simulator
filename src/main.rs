@@ -4,7 +4,6 @@ extern crate text_io;
 use std::io;
 use std::io::Write;
 use std::process::exit;
-use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
 //use std::borrow::BorrowMut;
@@ -19,66 +18,209 @@ enum SimResult<D, E> {
     Err(E),
 
     /// Indicates result is not yet available but was successful. First field is
-    /// the number of simulator cycles before the value will be ready. The value of
+    /// the number of simulator cycles before the value will be ready. A value of
     /// 0 indicates the result is ready. The second field is the value.
     Wait(u16, D),
 }
 
-// Memory, A is the address type, D is the data type.
+/// Memory provides an interface to access a memory struct, A is the address type,
+/// D is the data type.
 trait Memory<A, D> {
+    /// Retrieve data at a memory address.
     fn get(&mut self, address: A) -> SimResult<D, String>;
+
+    /// Place data at a memory address.
     fn set(&mut self, address: A, data: D) -> SimResult<(), String>;
 }
 
-// InspectableMemory allows a memory unit to be insepcted for user
-// interface purposes. A is the address type.
+/// InspectableMemory allows a memory unit to be insepcted for user
+/// interface purposes. A is the address type.
 trait InspectableMemory<A> {
-    // Returns a text description of an address.
+    /// Returns a text description of the entire data structure.
+    fn inspect_txt(&self) -> Result<String, String>;
+    
+    /// Returns a text description of an address.
     fn inspect_address_txt(&self, address: A) -> Result<String, String>;
 }
 
+/// Length of cache lines
+const CACHE_LINE_LEN: usize = 4;
+
+/// Simulates the slow DRAM memory. Since data is stored in groups of 4 the lower
+/// 2 bits of each address will be truncated.
 struct DRAM {
+    /// Number of processor cycles it takes to retrieve data.
     delay: u16,
-    data: HashMap<u32, u32>,
+
+    /// Data in memory stored in a linear form. Since DRAM can be quite large we
+    /// don't want to store all unset addresses. We use a data_table for this.
+    data: Vec<[u32; CACHE_LINE_LEN]>,
+
+    /// Keeps track of the start index in the data field for regions of memory.
+    data_table: Vec<DRAMDataTableEntry>,
+}
+
+/// Entry in the DRAM data_table.
+#[derive(Clone,Copy)]
+struct DRAMDataTableEntry {
+    /// First address in memory region, inclusive.
+    start_address: u32,
+
+    /// Index in the DRAM data field.
+    data_index: usize,
+
+    /// Length of memory region, inclusive.
+    length: u32,
 }
 
 impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: HashMap::new(),
+            data: Vec::new(),
+            data_table: Vec::new(),
         }
+    }
+
+    /// Returns the data table entry for the specified address. Second entry in
+    /// tuple is the index in the data_table which the entry was found. The address
+    /// argument should already have its lower 2 bits truncated. For internal use.
+    fn data_table_entry(&self, address: u32) -> Option<(DRAMDataTableEntry, usize)> {
+        let mut idx = 0;
+        for entry in self.data_table.iter() {
+            if address >= entry.start_address && address <= (entry.start_address + entry.length) {
+                return Some((*entry, idx));
+            }
+
+            idx += 1;
+        }
+
+        None
     }
 }
 
 impl InspectableMemory<u32> for DRAM {
-    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
-        match self.data.get(&address) {
-            Some(d) => Ok(format!("\
-Address: {}
-Value  : {}", address, *d)),
-            None => Ok(format!("Does not exist")),
+    fn inspect_txt(&self) -> Result<String, String> {
+        let mut out = String::new();
+        out.push_str(format!("Delay: {}", self.delay).as_str());
+        out.push_str("\nData Table:");
+
+        for entry in self.data_table.iter() {
+            out.push_str(format!("\n    Start Address: {}, Data Index: {}, Length: {}",
+                             entry.start_address, entry.data_index, entry.length).as_str());
         }
+
+        out.push_str("\nData:");
+        let mut idx: usize = 0;
+        while idx < self.data.len() {
+            out.push_str(format!("\n    {}: {:?}", idx, self.data[idx]).as_str());
+            idx += 1;
+        }
+
+        Ok(out)
+    }
+    
+    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+        let trimmed_address = address >> 2;
+        
+        // Find route_table entry
+        let value = match self.data_table_entry(trimmed_address) {
+            Some((entry, entry_idx)) => {
+                self.data[entry.data_index + (address as usize)]
+            },
+            None => {
+                [0; 4]
+            },
+        };
+
+        Ok(format!("\
+Address: {}
+Value  : {:?}", address, value))
     }
 }
 
-impl Memory<u32, u32> for DRAM {
-    fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        match self.data.get(&address) {
-            Some(d) => SimResult::Wait(self.delay, *d),
+impl Memory<u32, [u32; CACHE_LINE_LEN]> for DRAM {
+    fn get(&mut self, raw_address: u32) -> SimResult<[u32; CACHE_LINE_LEN], String> {
+        // Truncate lower 2 bits of address since data stored in groups of 4
+        let address = raw_address >> 2;
+        
+        // Find address range in data_table
+        let (range_entry, _idx) = match self.data_table_entry(address) {
+            Some(e) => e,
             None => {
-                self.data.insert(address, 0);
-                SimResult::Wait(self.delay, 0)
-            }
-        }
+                // No value explicity stored
+                return SimResult::Wait(self.delay, [0; 4])
+            },
+        };
+
+        // Find value in data array
+        let data_idx = range_entry.data_index + ((range_entry.start_address - address) as usize);
+        SimResult::Wait(self.delay, self.data[data_idx])
     }
     
-    fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
-        self.data.insert(address, data);
+    fn set(&mut self, raw_address: u32, data: [u32; CACHE_LINE_LEN]) -> SimResult<(), String> {
+        // Truncate lower 2 bits of address since data stored in groups of 4
+        let address = raw_address >> 2;
+
+        // Check if address range in data_table
+        let (range_entry, entry_idx) = match self.data_table_entry(address) {
+            Some(d) => d,
+            None => {
+                // No entry, first find index to insert at
+                let mut insert_idx: usize = 0;
+                let mut last_calc_data_idx: usize = 0;
+                while insert_idx < self.data_table.len() &&
+                    self.data_table[insert_idx].start_address < address {
+                        
+                    last_calc_data_idx = self.data_table[insert_idx].data_index +
+                        (self.data_table[insert_idx].length as usize);
+                    insert_idx += 1;
+                }
+
+                // Insert
+                self.data_table.insert(insert_idx, DRAMDataTableEntry{
+                    start_address: address,
+                    data_index: last_calc_data_idx,
+                    length: 0,
+                });
+
+                (self.data_table[insert_idx], insert_idx)
+            },
+        };
+
+        // Insert
+        self.data.insert(range_entry.data_index, data);
+        self.data_table[entry_idx].length += 1;
+
+        // Modify other data table entries to account for newly inserted data
+        let mut modify_idx = entry_idx + 1;
+
+        while modify_idx < self.data_table.len() {
+            self.data_table[modify_idx].data_index += 1;
+            
+            modify_idx += 1;
+        }
+        
+        // Coalesce data table entries
+        modify_idx = 0;
+
+        while modify_idx < self.data_table.len() - 1 {
+            let entry = self.data_table[modify_idx];
+            let next_entry = self.data_table[modify_idx];
+
+            if (entry.start_address + entry.length) == next_entry.start_address {
+                self.data_table.remove(modify_idx);
+            }
+            
+            modify_idx += 1;
+        }
+
+        // Return
         SimResult::Wait(self.delay, ())
     }
 }
 
+/*
 const DM_CACHE_LINES: usize = 1024;
 
 // Direct mapped cache.
@@ -88,15 +230,13 @@ const DM_CACHE_LINES: usize = 1024;
 struct DMCache {
     delay: u16,
     lines: [DMCacheLine; DM_CACHE_LINES],
-    base: Rc<RefCell<dyn Memory<u32, u32>>>,
+    base: Rc<RefCell<dyn Memory<u32, [u32; CACHE_LINE_LEN]>>>,
 }
-
-const DM_CACHE_LINE_LENGTH: usize = 4;
 
 #[derive(Copy,Clone)]
 struct DMCacheLine {
     tag: u32,
-    data: [u32; DM_CACHE_LINE_LENGTH],
+    data: [u32; CACHE_LINE_LEN],
     valid: bool,
     dirty: bool,
 }
@@ -105,7 +245,7 @@ impl DMCacheLine {
     fn new() -> DMCacheLine {
         DMCacheLine{
             tag: 0,
-            data: [0; DM_CACHE_LINE_LENGTH],
+            data: [0; CACHE_LINE_LEN],
             valid: false,
             dirty: false,
         }
@@ -113,7 +253,7 @@ impl DMCacheLine {
 }
 
 impl DMCache {
-    fn new(delay: u16, base: Rc<RefCell<dyn Memory<u32, u32>>>) -> DMCache {
+    fn new(delay: u16, base: Rc<RefCell<dyn Memory<u32, [u32; CACHE_LINE_LEN]>>>) -> DMCache {
         let lines = [DMCacheLine::new(); DM_CACHE_LINES];
 
         DMCache{
@@ -131,30 +271,31 @@ impl DMCache {
         ((address & 0xFFC) >> 2) as usize
     }
     
-    fn get_address_tag(&self, address: u32) -> u22 {
-        u22::new(address >> 12)
+    fn get_address_tag(&self, address: u32) -> u32 {
+        address >> 12
     }
 }
 
 impl InspectableMemory<u32> for DMCache {
-    // TODO: Make DMCache.inspect_address_txt show offset
     fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
         let idx = self.get_address_index(address);
+        let offset = self.get_address_offset(address);
 
         let line = self.lines[idx];
 
         Ok(format!("\
-Index: {}
-Tag  : {}
-Data : {}
-Valid: {}
-Dirty: {}", idx,
-                   line.tag, line.data, line.valid, line.dirty))
+Index : {}
+Tag   : {}
+Offset: {}
+Data  : {:?}
+Valid : {}
+Dirty : {}", idx, line.tag, offset, line.data, line.valid, line.dirty))
     }
 }
 
 impl Memory<u32, u32> for DMCache {
     // TODO: Make DMCache.{get,set} use offset
+    // TODO: Make DMCache.{get,set} use base as Memory<u32, [u32; CACHE_LINE_LEN]>
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
         // Extract components from address
         let idx = self.get_address_index(address);
@@ -184,8 +325,6 @@ impl Memory<u32, u32> for DMCache {
                 }
             }
 
-            // TODO: make DMCache.get miss logic use offset
-
             // Get value from cache layer below
             let get_res = self.base.borrow_mut().get(address);
 
@@ -213,7 +352,7 @@ impl Memory<u32, u32> for DMCache {
     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
         // Get line
         let idx = self.get_address_index(address);
-        let tag: u22 = self.get_address_tag(address);
+        let tag = self.get_address_tag(address);
 
         let line = self.lines[idx];
 
@@ -251,6 +390,7 @@ impl Memory<u32, u32> for DMCache {
         }
     }
 }
+*/
 
 fn help() {
     println!("Commands:
@@ -265,11 +405,14 @@ fn help() {
 fn main() {
     // TODO: line length 4
     let dram = Rc::new(RefCell::new(DRAM::new(100)));
+    /*
     let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
     let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
     let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
+*/
 
-    let memory = &l1_cache;
+    //let memory = &l1_cache;
+    let memory = &dram;
     
     help();
 
@@ -293,7 +436,7 @@ fn main() {
                                                    address, e),
                     SimResult::Wait(c, v) => {
                         println!("Completed in {} cycles", c);
-                        println!("{}: {}", address, v);
+                        println!("{}: {:?}", address, v);
                     }
                 };
             },
@@ -304,7 +447,7 @@ fn main() {
                 scan!(operands.bytes() => "{}, {}", address, data);
 
                 // Perform operation
-                match memory.borrow_mut().set(address, data) {
+                match memory.borrow_mut().set(address, [data; 4]) {
                     SimResult::Err(e) => eprintln!("Failed to set {}: {}",
                                                    address, e),
                     SimResult::Wait(c, _v) => {
@@ -315,26 +458,48 @@ fn main() {
             "show" => {
                 // Parse operands
                 let level: String;
-                let address: u32;
-                scan!(operands.bytes() => "{}, {}", level, address);
+                let address_str: String;
+                scan!(operands.bytes() => "{}, {}", level, address_str);
 
-                let inspect_res = match level.as_str() {
-                    "L1" => l1_cache.borrow().inspect_address_txt(address),
-                    "L2" => l2_cache.borrow().inspect_address_txt(address),
-                    "L3" => l3_cache.borrow().inspect_address_txt(address),
-                    "DRAM" => dram.borrow().inspect_address_txt(address),
-                    _ => Err(format!("Cache level name \"{}\" not recognized",
-                                     level)),
+                let inspect_res = match address_str.as_str() {
+                    "_" => {
+                        match level.as_str() {
+                            "DRAM" => dram.borrow().inspect_txt(),
+                            _ => Err(format!("Cache level name \"{}\" not recognized", level)),
+                        }
+                    },
+                    _ => Err(format!("Specific address show not supported at this time")),
+                    /*
+                    _ => {
+                        let address: u32 = match address_str.parse() {
+                            Err(e) => {
+                                return Err(format!("Failed to parse address argument {} as u32: {}", address_str, e));
+                            },
+                            Ok(v) => v,
+                        };
+                        
+                        match level.as_str() {
+                            /*
+                            "L1" => l1_cache.borrow().inspect_address_txt(address),
+                            "L2" => l2_cache.borrow().inspect_address_txt(address),
+                            "L3" => l3_cache.borrow().inspect_address_txt(address),
+*/
+                            "DRAM" => dram.borrow().inspect_address_txt(address),
+                            _ => Err(format!("Cache level name \"{}\" not recognized",
+                                             level)),
+                        }
+                    },
+*/
                 };
 
                 match inspect_res {
                     Ok(txt) => {
-                        println!("{} at {}", level, address);
+                        println!("{} at {}", level, address_str);
                         println!("{}", txt);
                     },
                     Err(e) => {
-                        eprintln!("Failed to inspect {} at {}: {}", level, address,
-                                  e);
+                        eprintln!("Failed to inspect {} at {}: {}", level,
+                                  address_str, e);
                     }
                 };
             },
