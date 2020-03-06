@@ -403,6 +403,7 @@ fn help() {
 }
 
 fn main() {
+    // TODO: Figure out why set(5, x), set(6, x), get(5) == 6, get(6) == 6, but 5 and 6 get placed in different DRAM.data indexes, is this bc the mechanism hasn't quite been refactored to store 4 values in each index? I thought truncating first 2 bits of address would do this, investigate...
     // TODO: line length 4
     let dram = Rc::new(RefCell::new(DRAM::new(100)));
     /*
