@@ -546,6 +546,7 @@ mod tests {
         dram.set(ADDR_A, VAL_A).unwrap("Failed to set a");
         dram.set(ADDR_B, VAL_B).unwrap("Failed to set b");
 
+        assert_eq!(dram.data_table.len(), 2, "Data table length");
         assert_eq!(dram.data_table[0], DRAMDataTableEntry{
             start_address: ADDR_A >> 2,
             data_index: 0,
@@ -561,6 +562,118 @@ mod tests {
                    "Value for A");
         assert_eq!(dram.get(ADDR_B).unwrap("Failed to get b").1, VAL_B,
                    "Value for B");
+
+        // Ensure data_table entries are created for in the middle
+        const ADDR_C: u32 = 250;
+        const VAL_C: [u32; 4] = [333; 4];
+
+        dram.set(ADDR_C, VAL_C).unwrap("Failed to set c");
+
+        assert_eq!(dram.data_table.len(), 3, "Data table length");
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
+            start_address: ADDR_A >> 2,
+            data_index: 0,
+            length: 1,
+        }, "Data table entry for A");
+        assert_eq!(dram.data_table[1], DRAMDataTableEntry{
+            start_address: ADDR_C >> 2,
+            data_index: 1,
+            length: 1,
+        }, "Data table entry for C");
+        assert_eq!(dram.data_table[2], DRAMDataTableEntry{
+            start_address: ADDR_B >> 2,
+            data_index: 2,
+            length: 1,
+        }, "Data table entry for B");
+
+        assert_eq!(dram.get(ADDR_A).unwrap("Failed to get a").1, VAL_A,
+                   "Value for A");
+        assert_eq!(dram.get(ADDR_B).unwrap("Failed to get b").1, VAL_B,
+                   "Value for B");
+        assert_eq!(dram.get(ADDR_C).unwrap("Failed to get c").1, VAL_C,
+                   "Value for C");
+    }
+
+    /// Tests the case where data table entries are covering a low and high value
+    /// and then a value is inserted in the middle which should cause all the
+    /// entries to collapse into one.
+    #[test]
+    fn test_dram_data_table_coalesce_collapse() {
+        let mut dram = DRAM::new(100);
+
+        const ADDR_LOW: u32 = 0;
+        const VAL_LOW: [u32; 4] = [1; 4];
+        
+        const ADDR_MIDDLE: u32 = 4;
+        const VAL_MIDDLE: [u32; 4] = [2; 4];
+        
+        const ADDR_HIGH: u32 = 8;
+        const VAL_HIGH: [u32; 4] = [3; 4];
+
+        // Before coalesce
+        dram.set(ADDR_LOW, VAL_LOW).unwrap("Failed to set low");
+        dram.set(ADDR_HIGH, VAL_HIGH).unwrap("Failed to set high");
+
+        assert_eq!(dram.data_table.len(), 2, "Data table length");
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
+            start_address: ADDR_LOW >> 2,
+            data_index: 0,
+            length: 1,
+        }, "Data table entry for low");
+        assert_eq!(dram.data_table[1], DRAMDataTableEntry{
+            start_address: ADDR_HIGH >> 2,
+            data_index: 1,
+            length: 1,
+        }, "Data table entry for high");
+
+        assert_eq!(dram.get(ADDR_LOW).unwrap("Failed to get low").1, VAL_LOW,
+                   "Value for low");
+        assert_eq!(dram.get(ADDR_HIGH).unwrap("Failed to get high").1, VAL_HIGH,
+                   "Value for high");
+
+        // Make coalesce occur
+        dram.set(ADDR_MIDDLE, VAL_MIDDLE).unwrap("Failed to set middle");
+
+        assert_eq!(dram.data_table.len(), 1, "Data table length");
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
+            start_address: ADDR_LOW >> 2,
+            data_index: 0,
+            length: 3,
+        }, "Data table entry for all");
+
+        assert_eq!(dram.get(ADDR_LOW).unwrap("Failed to get low").1, VAL_LOW,
+                   "Value for low");
+        assert_eq!(dram.get(ADDR_MIDDLE).unwrap("Failed to get middle").1,
+                   VAL_MIDDLE, "Value for middle");
+        assert_eq!(dram.get(ADDR_HIGH).unwrap("Failed to get high").1, VAL_HIGH,
+                   "Value for high");
+    }
+
+    /// Tests data table entries where a low address is inserted, then a middle
+    /// address. At this point the first data table entry should take on this
+    /// middle address. Then a high address in inserted, causing the entry to take
+    /// on the third address.
+    #[test]
+    fn dram_data_table_coalesce_low_high() {
+        let mut dram = DRAM::new(100);
+        
+        const ADDR_LOW: u32 = 0;
+        const VAL_LOW: [u32; 4] = [1; 4];
+        
+        const ADDR_MIDDLE: u32 = 4;
+        const VAL_MIDDLE: [u32; 4] = [2; 4];
+        
+        const ADDR_HIGH: u32 = 8;
+        const VAL_HIGH: [u32; 4] = [3; 4];
+
+        // Insert low
+        dram.set(ADDR_LOW, VAL_LOW).unwrap("Failed to set low");
+
+        assert_eq!(dram.data_table.len(), 1);
+        assert_eq!(dram.data_table.[0], DRAMDataTableEntry{
+            start_address: ADDR_LOW >> 2,
+            // TODO: Finish dram.data_table coalesce low -> high test
+        }, "Data table entry for low");
     }
 
     // TODO: Write data_table coalesce test, write insert in middle of range test
