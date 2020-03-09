@@ -3,9 +3,10 @@ extern crate text_io;
 extern crate bincode;
 extern crate serde;
 
+use std::path::Path;
 use std::io;
-use std::io::Write;
-use std::fs::File;
+use std::fs::{File, OpenOptions, remove_file};
+use std::io::{Read, Write, BufReader, BufRead, LineWriter};
 use std::process::exit;
 use std::str::FromStr;
 
@@ -78,8 +79,20 @@ impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: File::create("src/dram").expect("Unable to create dram"),
+            data: DRAM::create(),
         }
+    }
+
+    fn create() -> File {
+        let disk_file_path = Path::new("src/dram");
+        let mut file: File;
+        if !disk_file_path.exists() {
+            file = File::create(disk_file_path).expect("Failed to create");
+            file.write_all("0 1 0\n".as_bytes()).expect("Bad write");
+        }else{
+            file = File::open(disk_file_path).expect("Failed to open");
+        }
+        return file;
     }
 }
 
@@ -95,15 +108,17 @@ impl DRAMLine {
 
 impl Memory<u32, u32> for DRAM {
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        let mut file = &self.data;
-
-        let tag: u32 = (address >> 10) << 10;
-        let mut vec: Vec<DRAMLine> = bincode::deserialize_from(file).expect("Bad");
-
-        for i in 0..vec.len() {
-            let line: &DRAMLine = vec.get(i).unwrap();
-            if line.tag == tag && line.valid {
-                return SimResult::Wait(self.delay, line.data);
+        let file: File = File::open("src/dram").unwrap();
+        let reader = BufReader::new(file);
+        let mut tag: u32 = (address >> 10) << 10;
+        for (index, line) in reader.lines().enumerate(){
+            let line = line.unwrap();
+            let data: Vec<&str> = line.split(" ").collect();
+            let data0 = data[0].parse::<u32>().unwrap();
+            let data1 = data[1].parse::<u32>().unwrap();
+            let data2 = data[2].parse::<u32>().unwrap();
+            if tag == data0 && data1 == 1{
+                return SimResult::Wait(self.delay, data2);
             }
         }
 
@@ -113,25 +128,32 @@ impl Memory<u32, u32> for DRAM {
     
     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
 
-        let mut file = &self.data;
+        let file = File::open("src/dram").unwrap();
+        let reader = BufReader::new(file);
+        remove_file("src/dram");
+        let file = File::create("src/dram").unwrap();
+        let mut writer = LineWriter::new(file);
+        let mut tag: u32 = (address >> 10) << 10;
 
-        // let mut initvec: Vec<DRAMLine> = Vec::new();
-        let mut zero: DRAMLine = DRAMLine::new(0,0);
-        // initvec.push(zero);
-        bincode::serialize_into(file, &zero);
-
-        // let tag: u22 = u22::new(address >> 10);
-        let tag: u32 = (address >> 10) << 10;
-
-        let mut lineToSet = DRAMLine::new(tag, data);
-        // let mut vec: Vec<DRAMLine> = bincode::deserialize_from(file).expect("Nope");
-        let z: DRAMLine = bincode::deserialize_from(file).expect("Bad");  //THIS IS NOT WORKING, AND I DONT KNOW WHY
-        println!("{}",z.tag);
-        // vec.push(lineToSet);
-        // bincode::serialize_into(file, &vec);
-
-
-        return SimResult::Wait(self.delay, ())
+        let mut i=0;
+        for (index, line) in reader.lines().enumerate(){
+            let line = line.unwrap();
+            let items_in_line: Vec<&str> = line.split(" ").collect();
+            let data0 = items_in_line[0].parse::<u32>().unwrap();
+            let data1 = items_in_line[1].parse::<u32>().unwrap();
+            let data2 = items_in_line[2].parse::<u32>().unwrap();
+            if tag < data0 && data1 == 1 && i==0{
+                writer.write_all(format!("{} 1 {}\n",tag.to_string(), data2.to_string()).as_bytes());
+                i=1;
+            }
+            if address == data0 && data1 == 1 && i==0{
+                writer.write_all(format!("{} 1 {}\n",tag.to_string(), data2.to_string()).as_bytes());
+                i=1;
+                continue;
+            }
+            writer.write_all(format!("{} {} {}\n",data0.to_string(), data1.to_string(), data2.to_string()).as_bytes());
+        }
+        return SimResult::Wait(self.delay, ());
     }
 }
 
