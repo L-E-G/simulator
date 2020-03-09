@@ -143,11 +143,11 @@ impl Memory<u32, u32> for DRAM {
             let data1 = items_in_line[1].parse::<u32>().unwrap();
             let data2 = items_in_line[2].parse::<u32>().unwrap();
             if tag < data0 && data1 == 1 && i==0{
-                writer.write_all(format!("{} 1 {}\n",tag.to_string(), data2.to_string()).as_bytes());
+                writer.write_all(format!("{} 1 {}\n",address.to_string(), data.to_string()).as_bytes());
                 i=1;
             }
             if address == data0 && data1 == 1 && i==0{
-                writer.write_all(format!("{} 1 {}\n",tag.to_string(), data2.to_string()).as_bytes());
+                writer.write_all(format!("{} 1 {}\n",address.to_string(), data.to_string()).as_bytes());
                 i=1;
                 continue;
             }
