@@ -117,7 +117,7 @@ impl Memory<u32, u32> for DRAM {
             let data0 = items_in_line[0].parse::<u32>().unwrap();
             let data1 = items_in_line[1].parse::<u32>().unwrap();
             let data2 = items_in_line[2].parse::<u32>().unwrap();
-            if address == data0 && data1 == 1{
+            if tag == data0 && data1 == 1{
                 return SimResult::Wait(self.delay, data2);
             }
         }
@@ -139,19 +139,22 @@ impl Memory<u32, u32> for DRAM {
         for (index, line) in reader.lines().enumerate(){
             let line = line.unwrap();
             let items_in_line: Vec<&str> = line.split(" ").collect();
-            let data0 = items_in_line[0].parse::<u32>().unwrap();
-            let data1 = items_in_line[1].parse::<u32>().unwrap();
-            let data2 = items_in_line[2].parse::<u32>().unwrap();
-            if address < data0 && data1 == 1 && i==0{
-                writer.write_all(format!("{} 1 {}\n",address.to_string(), data.to_string()).as_bytes());
+            let tagFromLine = items_in_line[0].parse::<u32>().unwrap();
+            let valid = items_in_line[1].parse::<u32>().unwrap();
+            let value = items_in_line[2].parse::<u32>().unwrap();
+            if tag < tagFromLine && valid == 1 && i==0{
+                writer.write_all(format!("{} 1 {}\n",tag.to_string(), data.to_string()).as_bytes());
                 i=1;
             }
-            if address == data0 && data1 == 1 && i==0{
-                writer.write_all(format!("{} 1 {}\n",address.to_string(), data.to_string()).as_bytes());
+            if tag == tagFromLine && valid == 1 && i==0{
+                writer.write_all(format!("{} 1 {}\n",tagFromLine.to_string(), data.to_string()).as_bytes());
                 i=1;
                 continue;
             }
-            writer.write_all(format!("{} {} {}\n",data0.to_string(), data1.to_string(), data2.to_string()).as_bytes());
+            writer.write_all(format!("{} {} {}\n",tagFromLine.to_string(), valid.to_string(), value.to_string()).as_bytes());
+        }
+        if i == 0{
+            writer.write_all(format!("{} 1 {}\n",tag.to_string(), data.to_string()).as_bytes());
         }
         return SimResult::Wait(self.delay, ());
     }
