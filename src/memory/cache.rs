@@ -2,14 +2,20 @@ extern crate ux;
 extern crate text_io;
 
 use std::path::Path;
-use std::io;
-use std::fs::{File, OpenOptions, remove_file};
-use std::io::{Read, Write, BufReader, BufRead, LineWriter};
+use std::fs::{File, remove_file};
+use std::io::{Write, BufReader, BufRead, LineWriter};
+use std::sync::mpsc;
+use std::sync::mpsc::{Sender, Receiver};
 
 use ux::{u22};
 
+lazy_static! {
+    static ref dummydram: DRAM = DRAM::new(0);
+    static ref memory: &'static mut dyn Memory<u32, u32> = &mut dummydram;
+}
 // const dummydram: DRAM = DRAM::new(0);
-static mut memory: &mut dyn Memory<u32, u32> = &mut 0;
+
+// static mut memory: &mut dyn Memory<u32, u32> = &mut *a_mod::dummydram;
 
 /// Indicates the status of a simulator operation with either a value, error, or
 /// result which will be available after a delay. D is the data type, E is the

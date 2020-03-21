@@ -1,16 +1,11 @@
+#[macro_use]
+extern crate lazy_static;
 extern crate ux;
 extern crate text_io;
-extern crate bincode;
-extern crate serde;
 
-use std::path::Path;
 use std::io;
-use std::fs::{File, OpenOptions, remove_file};
-use std::io::{Read, Write, BufReader, BufRead, LineWriter};
+use std::io::{Read, Write};
 use std::process::exit;
-use std::str::FromStr;
-
-use ux::{u22};
 use text_io::scan;
 
 mod memory;
@@ -68,11 +63,7 @@ fn help() {
 }
 
 fn main() {
-    // memory::cache::newDram(100);
-    // memory::cache::newCache(4);
     memory::cache::newMemory(100, 4);
-
-    
     
     help();
     
