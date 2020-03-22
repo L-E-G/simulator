@@ -6,14 +6,15 @@ use std::fs::{File, remove_file};
 use std::io::{Write, BufReader, BufRead, LineWriter};
 use std::sync::mpsc;
 use std::sync::mpsc::{Sender, Receiver};
+use std::marker::Sync;
 
 use ux::{u22};
 
 lazy_static! {
     static ref dummydram: DRAM = DRAM::new(0);
     static ref memory: &'static mut dyn Memory<u32, u32> = &mut dummydram;
-    impl !Sync for memory {}
 }
+unsafe impl !Sync for memory {}
 // const dummydram: DRAM = DRAM::new(0);
 
 // static mut memory: &mut dyn Memory<u32, u32> = &mut *a_mod::dummydram;
@@ -80,7 +81,7 @@ pub fn set(address: u32, data: u32) -> SimResult<(), String> {
 }
 
 // Memory, A is the address type, D is the data type.
-pub trait Memory<A, D> {
+trait Memory<A, D> {
     fn get(&mut self, address: A) -> SimResult<D, String>;
     fn set(&mut self, address: A, data: D) -> SimResult<(), String>;
 }
@@ -88,12 +89,6 @@ pub trait Memory<A, D> {
 struct DRAM {
     delay: u16,
     data: File,
-}
-
-struct DRAMLine {
-    tag: u32,
-    valid: bool,
-    data: u32,
 }
 
 impl DRAM {
@@ -114,16 +109,6 @@ impl DRAM {
             file = File::open(disk_file_path).expect("Failed to open");
         }
         return file;
-    }
-}
-
-impl DRAMLine {
-    fn new(tag: u32, data: u32) -> DRAMLine{
-        DRAMLine{
-            tag: tag,
-            valid: true,
-            data: data,
-        }
     }
 }
 
