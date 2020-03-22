@@ -12,6 +12,7 @@ use ux::{u22};
 lazy_static! {
     static ref dummydram: DRAM = DRAM::new(0);
     static ref memory: &'static mut dyn Memory<u32, u32> = &mut dummydram;
+    impl !Sync for memory {}
 }
 // const dummydram: DRAM = DRAM::new(0);
 
