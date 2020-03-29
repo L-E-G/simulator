@@ -2,12 +2,13 @@ extern crate ux;
 extern crate text_io;
 
 use std::io;
-use std::io::Write;
 use std::process::exit;
-use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
-//use std::borrow::BorrowMut;
+use std::path::Path;
+use std::fs::{File, remove_file};
+use std::io::{Write, BufReader, BufRead, LineWriter};
+use std::borrow::BorrowMut;
 
 use ux::{u22};
 use text_io::scan;
@@ -53,6 +54,13 @@ impl<D, E> SimResult<D, E> {
     }
 }
 
+
+//----------------------------------------------Cache-------------------------------------------------
+
+
+
+//-----------------------------DRAM---------------------------------
+
 // Memory, A is the address type, D is the data type.
 trait Memory<A, D> {
     fn get(&mut self, address: A) -> SimResult<D, String>;
@@ -64,49 +72,123 @@ trait Memory<A, D> {
 trait InspectableMemory<A> {
     // Returns a text description of an address.
     fn inspect_address_txt(&self, address: A) -> Result<String, String>;
+    fn get(&self, address: A) -> u32;
 }
 
 struct DRAM {
     delay: u16,
-    data: HashMap<u32, u32>,
+    data: File,
+}
+
+impl InspectableMemory<u32> for DRAM {
+    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+        let d = InspectableMemory::get(self, address);
+        if d == 0{
+            return Ok(format!("Does not exist"));
+        }
+        else{
+            return Ok(format!("\
+Address: {}
+Value  : {}", address, d));
+        }
+    }
+
+    fn get(&self, address: u32) -> u32 {
+        let file: File = File::open("src/dram").unwrap();
+        let reader = BufReader::new(file);
+        let mut tag: u32 = (address >> 10) << 10;
+        for (index, line) in reader.lines().enumerate(){
+            let line = line.unwrap();
+            let items_in_line: Vec<&str> = line.split(" ").collect();
+            let data0 = items_in_line[0].parse::<u32>().unwrap();
+            let data1 = items_in_line[1].parse::<u32>().unwrap();
+            let data2 = items_in_line[2].parse::<u32>().unwrap();
+            if tag == data0 && data1 == 1{
+                return data2;
+            }
+        }
+
+        return 0;
+    }
 }
 
 impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: HashMap::new(),
+            data: DRAM::create(),
         }
     }
-}
 
-impl InspectableMemory<u32> for DRAM {
-    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
-        match self.data.get(&address) {
-            Some(d) => Ok(format!("\
-Address: {}
-Value  : {}", address, *d)),
-            None => Ok(format!("Does not exist")),
+    fn create() -> File {
+        let disk_file_path = Path::new("src/dram");
+        let mut file: File;
+        if !disk_file_path.exists() {
+            file = File::create(disk_file_path).expect("Failed to create");
+            file.write_all("0 1 0\n".as_bytes()).expect("Bad write");
+        }else{
+            file = File::open(disk_file_path).expect("Failed to open");
         }
+        return file;
     }
 }
 
 impl Memory<u32, u32> for DRAM {
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        match self.data.get(&address) {
-            Some(d) => SimResult::Wait(self.delay, *d),
-            None => {
-                self.data.insert(address, 0);
-                SimResult::Wait(self.delay, 0)
+        let file: File = File::open("src/dram").unwrap();
+        let reader = BufReader::new(file);
+        let mut tag: u32 = (address >> 10) << 10;
+        for (index, line) in reader.lines().enumerate(){
+            let line = line.unwrap();
+            let items_in_line: Vec<&str> = line.split(" ").collect();
+            let data0 = items_in_line[0].parse::<u32>().unwrap();
+            let data1 = items_in_line[1].parse::<u32>().unwrap();
+            let data2 = items_in_line[2].parse::<u32>().unwrap();
+            if tag == data0 && data1 == 1{
+                return SimResult::Wait(self.delay, data2);
             }
         }
+
+        return SimResult::Wait(self.delay, 0);
+
     }
     
     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
-        self.data.insert(address, data);
-        SimResult::Wait(self.delay, ())
+
+        let file = File::open("src/dram").unwrap();
+        let reader = BufReader::new(file);
+        remove_file("src/dram");
+        let file = File::create("src/dram").unwrap();
+        let mut writer = LineWriter::new(file);
+        let mut tag: u32 = (address >> 10) << 10;
+
+        let mut i=0;
+        for (index, line) in reader.lines().enumerate(){
+            let line = line.unwrap();
+            let items_in_line: Vec<&str> = line.split(" ").collect();
+            let tagFromLine = items_in_line[0].parse::<u32>().unwrap();
+            let valid = items_in_line[1].parse::<u32>().unwrap();
+            let value = items_in_line[2].parse::<u32>().unwrap();
+            if tag < tagFromLine && valid == 1 && i==0{
+                writer.write_all(format!("{} 1 {}\n",tag.to_string(), data.to_string()).as_bytes());
+                i=1;
+            }
+            if tag == tagFromLine && valid == 1 && i==0{
+                writer.write_all(format!("{} 1 {}\n",tagFromLine.to_string(), data.to_string()).as_bytes());
+                i=1;
+                continue;
+            }
+            writer.write_all(format!("{} {} {}\n",tagFromLine.to_string(), valid.to_string(), value.to_string()).as_bytes());
+        }
+        if i == 0{
+            writer.write_all(format!("{} 1 {}\n",tag.to_string(), data.to_string()).as_bytes());
+        }
+        return SimResult::Wait(self.delay, ());
     }
 }
+
+
+//----------------------L1, L2, L3 Cache----------------------
 
 const DM_CACHE_LINES: usize = 1024;
 
@@ -173,6 +255,8 @@ Valid: {}
 Dirty: {}", idx,
                    line.tag, line.data, line.valid, line.dirty))
     }
+
+    fn get(&self, address: u32) -> u32 {return 0;}
 }
 
 impl Memory<u32, u32> for DMCache {
@@ -270,6 +354,81 @@ impl Memory<u32, u32> for DMCache {
     }
 }
 
+//----------------------------------------Instructions----------------------------------------
+
+
+trait Instruction<I> {
+    fn addUI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn addSI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn addF(&mut self, instruction: I) -> SimResult<(), String>;
+    fn addUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn addSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn addFImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn subUI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn subSI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn subF(&mut self, instruction: I) -> SimResult<(), String>;
+    fn subUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn subSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn subFImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn divUI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn divSI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn divF(&mut self, instruction: I) -> SimResult<(), String>;
+    fn divUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn divSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn divFImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn mltUI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn mltSI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn mltF(&mut self, instruction: I) -> SimResult<(), String>;
+    fn mltUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn mltSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn mltFImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn mv(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn cmpUI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn cmpSI(&mut self, instruction: I) -> SimResult<(), String>;
+    fn cmpF(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn asl(&mut self, instruction: I) -> SimResult<(), String>;
+    fn asr(&mut self, instruction: I) -> SimResult<(), String>;
+    fn aslImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn asrImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn lsl(&mut self, instruction: I) -> SimResult<(), String>;
+    fn lsr(&mut self, instruction: I) -> SimResult<(), String>;
+    fn lslImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn lsrImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn and(&mut self, instruction: I) -> SimResult<(), String>;
+    fn or(&mut self, instruction: I) -> SimResult<(), String>;
+    fn xor(&mut self, instruction: I) -> SimResult<(), String>;
+    fn andImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn orImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn xorImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn not(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn ldr(&mut self, instruction: I) -> SimResult<(), String>;
+    fn str(&mut self, instruction: I) -> SimResult<(), String>;
+    fn push(&mut self, instruction: I) -> SimResult<(), String>;
+    fn pop(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn jmp(&mut self, instruction: I) -> SimResult<(), String>;
+    fn jmpImm(&mut self, instruction: I) -> SimResult<(), String>;
+    fn jmpS(&mut self, instruction: I) -> SimResult<(), String>;
+    fn jmpSImm(&mut self, instruction: I) -> SimResult<(), String>;
+
+    fn sih(&mut self, instruction: I) -> SimResult<(), String>;
+    fn int(&mut self, instruction: I) -> SimResult<(), String>;
+    fn ijmp(&mut self, instruction: I) -> SimResult<(), String>;
+}
+
+
+//--------------------------------------------Main Function----------------------------------------------
+
+
 fn help() {
     println!("Commands:
 
@@ -282,12 +441,12 @@ fn help() {
 
 fn main() {
     // TODO: line length 4
-    let dram = Rc::new(RefCell::new(DRAM::new(100)));
+    let dram = RefCell::new(DRAM::new(100));
     let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
     let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
     let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
 
-    let memory = &l1_cache;
+    let memory = &dram;
     
     help();
 
@@ -325,7 +484,7 @@ fn main() {
                 scan!(operands.bytes() => "{}, {}", address, data);
 
                 // Perform operation
-                match memory.borrow_mut().set(address, data) {
+                match memory.set(address, data) {
                     SimResult::Ok(_v) => {
                         println!("Completed in 0 cycles");
                     },
