@@ -4,6 +4,35 @@ use std::rc::Rc;
 
 use crate::result::SimResult;
 
+/// Holds all computation registers.
+/// Indexes:
+/// - [0, 25]: General purpose
+/// - 26: Interrupt link return address
+/// - 27: Interrupt handler address
+/// - 28: Program counter
+/// - 29: Status
+/// - 30: Stack pointer
+/// - 31: Subroutine link return address
+pub type Registers = [u32; 32];
+
+/// Interupt link register index
+pub const INTLR: usize = 26;
+
+/// Interrupt handler register index
+pub const IHDLR: usize = 27;
+
+/// Program counter register index
+pub const PC: usize = 28;
+
+/// Status register index
+pub const STS: usize = 29;
+
+/// Stack pointer register index
+pub const SP: usize = 30;
+
+/// Link register index
+pub const LR: usize = 31;
+
 /// Memory provides an interface to access a memory struct, A is the address type,
 /// D is the data type.
 pub trait Memory<A, D> {
