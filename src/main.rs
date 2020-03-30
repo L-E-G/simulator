@@ -1,4 +1,3 @@
-extern crate ux;
 extern crate text_io;
 
 use std::io;
@@ -14,6 +13,7 @@ use text_io::scan;
 /// Indicates the status of a simulator operation with either a value, error, or
 /// result which will be available after a delay. D is the data type, E is the
 /// error type.
+#[derive(Debug,PartialEq)]
 enum SimResult<D, E: Display> {
     /// Error if operation failed.
     Err(E),
@@ -177,21 +177,32 @@ impl Memory<u32, [u32; CACHE_LINE_LEN]> for DRAM {
         let (range_entry, entry_idx) = match self.data_table_entry(address) {
             Some(d) => d,
             None => {
-                // No entry, first find index to insert at
-                let mut insert_idx: usize = 0;
-                let mut last_calc_data_idx: usize = 0;
+                // No entry, find index to insert entry at
+                let mut insert_idx: usize = 0; // Index to insert entry
+
+                // Index of last data item value for the last entry
+                let mut last_data_idx: usize = 0;
+
                 while insert_idx < self.data_table.len() &&
                     self.data_table[insert_idx].start_address < address {
                         
-                    last_calc_data_idx = self.data_table[insert_idx].data_index +
-                        (self.data_table[insert_idx].length as usize);
+                    last_data_idx = self.data_table[insert_idx].data_index +
+                        (self.data_table[insert_idx].length as usize) - 1;
                     insert_idx += 1;
                 }
 
                 // Insert
+                let mut data_insert_idx: usize = 0;
+                if insert_idx > 0 {
+                    // Set the insert idx to 1 past the last item of the last
+                    // data_table entry only if this isn't the first entry in the
+                    // data_table
+                    data_insert_idx = last_data_idx + 1;
+                }
+                
                 self.data_table.insert(insert_idx, DRAMDataTableEntry{
                     start_address: address,
-                    data_index: last_calc_data_idx,
+                    data_index: data_insert_idx,
                     length: 0,
                 });
 
@@ -200,7 +211,14 @@ impl Memory<u32, [u32; CACHE_LINE_LEN]> for DRAM {
         };
 
         // Insert
-        self.data.insert(range_entry.data_index, data);
+        if range_entry.data_index >= self.data.len() {
+            // If adding onto the end of the data vec, append
+            self.data.push(data);
+        } else {
+            // If inserting into the middle of the data vec, insert
+            self.data.insert(range_entry.data_index, data);
+        }
+        
         self.data_table[entry_idx].length += 1;
 
         // Modify other data table entries to account for newly inserted data
@@ -220,7 +238,7 @@ impl Memory<u32, [u32; CACHE_LINE_LEN]> for DRAM {
             let next_entry = self.data_table[modify_idx + 1];
 
             if (entry.start_address + entry.length) == next_entry.start_address {
-                self.data_table[modify_idx].length = next_entry.length;
+                self.data_table[modify_idx].length += next_entry.length;
                 self.data_table.remove(modify_idx + 1);
             }
 
@@ -532,6 +550,97 @@ fn main() {
 mod tests {
     use super::*;
 
+    /// Test the dram.get method.
+    #[test]
+    fn test_dram_get() {
+        const DELAY: u16 = 100;
+        let mut dram = DRAM::new(DELAY);
+
+        // Manually assemble data_table
+        const ADDR_A: u32 = 0;
+        const VAL_A: [u32; CACHE_LINE_LEN] = [111; CACHE_LINE_LEN];
+        const IDX_A: usize = 0;
+        const ENTRY_A: DRAMDataTableEntry = DRAMDataTableEntry{
+            start_address: ADDR_A >> 2,
+            data_index: IDX_A,
+            length: 1,
+        };
+        dram.data_table.push(ENTRY_A);
+        dram.data.push(VAL_A);
+        
+        const ADDR_B: u32 = 8;
+        const VAL_B: [u32; CACHE_LINE_LEN] = [222; CACHE_LINE_LEN];
+        const IDX_B: usize = 1;
+        const ENTRY_B: DRAMDataTableEntry = DRAMDataTableEntry{
+            start_address: ADDR_B >> 2,
+            data_index: IDX_B,
+            length: 1,
+        };
+        dram.data_table.push(ENTRY_B);
+        dram.data.push(VAL_B);
+        
+        const ADDR_C1: u32 = 16;
+        const ADDR_C2: u32 = 17;
+        const VAL_C1: [u32; CACHE_LINE_LEN] = [333; CACHE_LINE_LEN];
+        const VAL_C2: [u32; CACHE_LINE_LEN] = [444; CACHE_LINE_LEN];
+        const IDX_C1: usize = 2;
+        const IDX_C2: usize = 3;
+        const ENTRY_C: DRAMDataTableEntry = DRAMDataTableEntry{
+            start_address: ADDR_C1 >> 2,
+            data_index: IDX_C1,
+            length: 2,
+        };
+        dram.data_table.push(ENTRY_C);
+        dram.data.push(VAL_C1);
+        dram.data.push(VAL_C2);
+
+        // Test
+        assert_eq!(dram.get(ADDR_A), SimResult::Wait(DELAY, VAL_A));
+        assert_eq!(dram.get(ADDR_B), SimResult::Wait(DELAY, VAL_B));
+        assert_eq!(dram.get(ADDR_C1), SimResult::Wait(DELAY, VAL_C1));
+        assert_eq!(dram.get(ADDR_C2), SimResult::Wait(DELAY, VAL_C2));
+    }
+
+    /// Tests the dram.data_table_entry() helper. This function is used in both the
+    /// dram.{get(),set()} methods.
+    #[test]
+    fn test_dram_data_table_entry_helper() {
+        let mut dram = DRAM::new(100);
+
+        // Manually assemble data_table
+        const ADDR_A: u32 = 0;
+        const IDX_A: usize = 0;
+        const ENTRY_A: DRAMDataTableEntry = DRAMDataTableEntry{
+            start_address: ADDR_A >> 2,
+            data_index: IDX_A,
+            length: 1,
+        };
+        dram.data_table.push(ENTRY_A);
+        
+        const ADDR_B: u32 = 8;
+        const IDX_B: usize = 1;
+        const ENTRY_B: DRAMDataTableEntry = DRAMDataTableEntry{
+            start_address: ADDR_B >> 2,
+            data_index: IDX_B,
+            length: 1,
+        };
+        dram.data_table.push(ENTRY_B);
+        
+        const ADDR_C: u32 = 16;
+        const IDX_C: usize = 2;
+        const ENTRY_C: DRAMDataTableEntry = DRAMDataTableEntry{
+            start_address: ADDR_C >> 2,
+            data_index: IDX_C,
+            length: 1,
+        };
+        dram.data_table.push(ENTRY_C);
+
+        // Test
+        assert_eq!(dram.data_table_entry(ADDR_A >> 2), Some((ENTRY_A, 0)));
+        assert_eq!(dram.data_table_entry(ADDR_B >> 2), Some((ENTRY_B, 1)));
+        assert_eq!(dram.data_table_entry(ADDR_C >> 2), Some((ENTRY_C, 2)));
+    }
+
     #[test]
     fn test_dram_data_table_entries() {
         let mut dram = DRAM::new(100);
@@ -594,7 +703,7 @@ mod tests {
                    "Value for C");
     }
 
-    /// Tests the case where data table entries are covering a low and high value
+    /// Tests the case where data table entries are covering one low and high index
     /// and then a value is inserted in the middle which should cause all the
     /// entries to collapse into one.
     #[test]
@@ -610,9 +719,10 @@ mod tests {
         const ADDR_HIGH: u32 = 8;
         const VAL_HIGH: [u32; 4] = [3; 4];
 
-        // Before coalesce
+        // Set low an high indexes
         dram.set(ADDR_LOW, VAL_LOW).unwrap("Failed to set low");
         dram.set(ADDR_HIGH, VAL_HIGH).unwrap("Failed to set high");
+        println!("set: low, high: {:?}", dram.data);
 
         assert_eq!(dram.data_table.len(), 2, "Data table length");
         assert_eq!(dram.data_table[0], DRAMDataTableEntry{
@@ -631,8 +741,9 @@ mod tests {
         assert_eq!(dram.get(ADDR_HIGH).unwrap("Failed to get high").1, VAL_HIGH,
                    "Value for high");
 
-        // Make coalesce occur
+        // Make coalesce occur by setting middle index
         dram.set(ADDR_MIDDLE, VAL_MIDDLE).unwrap("Failed to set middle");
+        println!("set: low, middle, high: {:?}", dram.data);
 
         assert_eq!(dram.data_table.len(), 1, "Data table length");
         assert_eq!(dram.data_table[0], DRAMDataTableEntry{
@@ -670,10 +781,31 @@ mod tests {
         dram.set(ADDR_LOW, VAL_LOW).unwrap("Failed to set low");
 
         assert_eq!(dram.data_table.len(), 1);
-        assert_eq!(dram.data_table.[0], DRAMDataTableEntry{
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
             start_address: ADDR_LOW >> 2,
-            // TODO: Finish dram.data_table coalesce low -> high test
+            data_index: 0,
+            length: 1,
         }, "Data table entry for low");
+
+        // Insert middle
+        dram.set(ADDR_MIDDLE, VAL_MIDDLE).unwrap("Failed to set middle");
+
+        assert_eq!(dram.data_table.len(), 1);
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
+            start_address: ADDR_LOW >> 2,
+            data_index: 0,
+            length: 2,
+        }, "Data table entry for low and middle");
+
+        // Insert high
+        dram.set(ADDR_HIGH, VAL_HIGH).unwrap("Failed to set high");
+
+        assert_eq!(dram.data_table.len(), 1);
+        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
+            start_address: ADDR_LOW >> 2,
+            data_index: 0,
+            length: 3,
+        }, "Data table entry for low, middle, and high");
     }
 
     // TODO: Write data_table coalesce test, write insert in middle of range test
