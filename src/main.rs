@@ -259,170 +259,224 @@ Dirty: {}", idx,
     fn get(&self, address: u32) -> u32 {return 0;}
 }
 
-impl Memory<u32, u32> for DMCache {
-    fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        // Get line
-        let idx = self.get_address_index(address);
-        let tag: u22 = self.get_address_tag(address);
+// impl Memory<u32, u32> for DMCache {
+//     fn get(&mut self, address: u32) -> SimResult<u32, String> {
+//         // Get line
+//         let idx = self.get_address_index(address);
+//         let tag: u22 = self.get_address_tag(address);
 
-        let line = self.lines[idx];
+//         let line = self.lines[idx];
 
-        // Check if address in cache
-        if line.valid && line.tag == tag {
-            SimResult::Wait(self.delay, line.data)
-        } else {
-            let mut total_wait: u16 = self.delay;
+//         // Check if address in cache
+//         if line.valid && line.tag == tag {
+//             SimResult::Wait(self.delay, line.data)
+//         } else {
+//             let mut total_wait: u16 = self.delay;
             
-            // Evict current line if dirty and there is a conflict
-            if line.valid && line.tag != tag && line.dirty {
-                // Write to cache layer below
-                let evict_res = self.base.borrow_mut().set(address, line.data);
+//             // Evict current line if dirty and there is a conflict
+//             if line.valid && line.tag != tag && line.dirty {
+//                 // Write to cache layer below
+//                 let evict_res = self.base.borrow_mut().set(address, line.data);
 
-                if let SimResult::Err(e) = evict_res {
-                    return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
-                }
+//                 if let SimResult::Err(e) = evict_res {
+//                     return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
+//                 }
 
-                if let SimResult::Wait(c, _r) = evict_res {
-                    total_wait += c;
-                }
-            }
+//                 if let SimResult::Wait(c, _r) = evict_res {
+//                     total_wait += c;
+//                 }
+//             }
 
-            // Get value from cache layer below
-            let get_res = self.base.borrow_mut().get(address);
+//             // Get value from cache layer below
+//             let get_res = self.base.borrow_mut().get(address);
 
-            let data = match get_res {
-                SimResult::Ok(d) => d,
-                SimResult::Err(e) => {
-                    return SimResult::Err(format!("failed to get line value from base cache: {}", e));
-                },
-                SimResult::Wait(w, d) => {
-                    total_wait += w;
+//             let data = match get_res {
+//                 SimResult::Ok(d) => d,
+//                 SimResult::Err(e) => {
+//                     return SimResult::Err(format!("failed to get line value from base cache: {}", e));
+//                 },
+//                 SimResult::Wait(w, d) => {
+//                     total_wait += w;
                     
-                    d
-                }
-            };
+//                     d
+//                 }
+//             };
 
-            // Save in cache
-            self.lines[idx].valid = true;
-            self.lines[idx].dirty = false;
-            self.lines[idx].tag = tag;
-            self.lines[idx].data = data;
+//             // Save in cache
+//             self.lines[idx].valid = true;
+//             self.lines[idx].dirty = false;
+//             self.lines[idx].tag = tag;
+//             self.lines[idx].data = data;
 
-            SimResult::Wait(total_wait, data)
-        }
-    }
+//             SimResult::Wait(total_wait, data)
+//         }
+//     }
     
-    fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
-        // Get line
-        let idx = self.get_address_index(address);
-        let tag: u22 = self.get_address_tag(address);
+//     fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
+//         // Get line
+//         let idx = self.get_address_index(address);
+//         let tag: u22 = self.get_address_tag(address);
 
-        let line = self.lines[idx];
+//         let line = self.lines[idx];
 
-        // If line matches address
-        if line.valid && line.tag == tag {
-            self.lines[idx].dirty = true;
-            self.lines[idx].data = data;
+//         // If line matches address
+//         if line.valid && line.tag == tag {
+//             self.lines[idx].dirty = true;
+//             self.lines[idx].data = data;
 
-            SimResult::Wait(self.delay, ())
-        } else {
-            let mut total_wait: u16 = self.delay;
+//             SimResult::Wait(self.delay, ())
+//         } else {
+//             let mut total_wait: u16 = self.delay;
             
-            // Evict current line if dirty and there is a conflict
-            if line.valid && line.tag != tag && line.dirty {
-                // Write to cache layer below
-                let old_addr = (u32::from(line.tag) << 10) | (idx as u32);
-                let evict_res = self.base.borrow_mut().set(old_addr, line.data);
+//             // Evict current line if dirty and there is a conflict
+//             if line.valid && line.tag != tag && line.dirty {
+//                 // Write to cache layer below
+//                 let old_addr = (u32::from(line.tag) << 10) | (idx as u32);
+//                 let evict_res = self.base.borrow_mut().set(old_addr, line.data);
 
-                if let SimResult::Err(e) = evict_res {
-                    return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
-                }
+//                 if let SimResult::Err(e) = evict_res {
+//                     return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
+//                 }
 
-                if let SimResult::Wait(c, _r) = evict_res {
-                    total_wait += c;
-                }
-            }
+//                 if let SimResult::Wait(c, _r) = evict_res {
+//                     total_wait += c;
+//                 }
+//             }
 
-            // Save in cache
-            self.lines[idx].valid = true;
-            self.lines[idx].dirty = true;
-            self.lines[idx].tag = tag;
-            self.lines[idx].data = data;
+//             // Save in cache
+//             self.lines[idx].valid = true;
+//             self.lines[idx].dirty = true;
+//             self.lines[idx].tag = tag;
+//             self.lines[idx].data = data;
 
-            SimResult::Wait(total_wait, ())
-        }
-    }
-}
+//             SimResult::Wait(total_wait, ())
+//         }
+//     }
+// }
 
 //----------------------------------------Instructions----------------------------------------
 
+struct instruct {
+    inst: u32,
+    dest: isize,
+    op1: isize,
+    op2: isize,
+}
+
+impl instruct {
+    fn new(instruction: u32) -> instruct {
+        instruct{
+            inst: instruction,
+            dest: instruct::getdest(instruction),
+            op1: instruct::getop1(instruction),
+            op2: instruct::getop2(instruction),
+        }
+    }
+
+    fn getop1(inst: u32) -> isize {
+        let mut instString: String = inst.to_string();
+        let mut inststr: &str = &instString[..];
+        let mut instbin = isize::from_str_radix(inststr, 2).unwrap();
+
+        instbin = (instbin << 18) >> 31;
+        return instbin;
+    }
+
+    fn getop2(inst: u32) -> isize {
+        let mut instString: String = inst.to_string();
+        let mut inststr: &str = &instString[..];
+        let mut instbin = isize::from_str_radix(inststr, 2).unwrap();
+
+        instbin = (instbin << 23) >> 31;
+        return instbin;
+    }
+
+    fn getdest(inst: u32) -> isize {
+        let mut instString: String = inst.to_string();
+        let mut inststr: &str = &instString[..];
+        let mut instbin = isize::from_str_radix(inststr, 2).unwrap();
+
+        instbin = (instbin << 13) >> 31;
+        return instbin;
+    }
+}
 
 trait Instruction<I> {
-    fn addUI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn addSI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn addF(&mut self, instruction: I) -> SimResult<(), String>;
-    fn addUIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn addSIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn addFImm(&mut self, instruction: I) -> SimResult<(), String>;
+    
+    fn addUI(&mut self, instruction: I) -> SimResult<String, String>;
+    // fn addSI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn addF(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn addUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn addSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn addFImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn subUI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn subSI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn subF(&mut self, instruction: I) -> SimResult<(), String>;
-    fn subUIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn subSIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn subFImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn subUI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn subSI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn subF(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn subUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn subSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn subFImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn divUI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn divSI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn divF(&mut self, instruction: I) -> SimResult<(), String>;
-    fn divUIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn divSIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn divFImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn divUI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn divSI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn divF(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn divUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn divSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn divFImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn mltUI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn mltSI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn mltF(&mut self, instruction: I) -> SimResult<(), String>;
-    fn mltUIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn mltSIImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn mltFImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mltUI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mltSI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mltF(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mltUIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mltSIImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mltFImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn mv(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn mv(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn cmpUI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn cmpSI(&mut self, instruction: I) -> SimResult<(), String>;
-    fn cmpF(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn cmpUI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn cmpSI(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn cmpF(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn asl(&mut self, instruction: I) -> SimResult<(), String>;
-    fn asr(&mut self, instruction: I) -> SimResult<(), String>;
-    fn aslImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn asrImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn lsl(&mut self, instruction: I) -> SimResult<(), String>;
-    fn lsr(&mut self, instruction: I) -> SimResult<(), String>;
-    fn lslImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn lsrImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn asl(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn asr(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn aslImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn asrImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn lsl(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn lsr(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn lslImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn lsrImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn and(&mut self, instruction: I) -> SimResult<(), String>;
-    fn or(&mut self, instruction: I) -> SimResult<(), String>;
-    fn xor(&mut self, instruction: I) -> SimResult<(), String>;
-    fn andImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn orImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn xorImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn and(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn or(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn xor(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn andImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn orImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn xorImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn not(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn not(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn ldr(&mut self, instruction: I) -> SimResult<(), String>;
-    fn str(&mut self, instruction: I) -> SimResult<(), String>;
-    fn push(&mut self, instruction: I) -> SimResult<(), String>;
-    fn pop(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn ldr(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn str(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn push(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn pop(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn jmp(&mut self, instruction: I) -> SimResult<(), String>;
-    fn jmpImm(&mut self, instruction: I) -> SimResult<(), String>;
-    fn jmpS(&mut self, instruction: I) -> SimResult<(), String>;
-    fn jmpSImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn jmp(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn jmpImm(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn jmpS(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn jmpSImm(&mut self, instruction: I) -> SimResult<(), String>;
 
-    fn sih(&mut self, instruction: I) -> SimResult<(), String>;
-    fn int(&mut self, instruction: I) -> SimResult<(), String>;
-    fn ijmp(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn sih(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn int(&mut self, instruction: I) -> SimResult<(), String>;
+    // fn ijmp(&mut self, instruction: I) -> SimResult<(), String>;
+}
+
+impl Instruction<u32> for instruct{
+
+    fn addUI(&mut self, instruction: u32) -> SimResult<String, String> {
+
+        let result: isize = self.op1.checked_add(self.op2).unwrap();
+        return SimResult::Ok(result.to_string());
+    }
 }
 
 
@@ -441,94 +495,101 @@ fn help() {
 
 fn main() {
     // TODO: line length 4
-    let dram = RefCell::new(DRAM::new(100));
-    let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
-    let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
-    let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
+    let dram = DRAM::new(100);
+    // let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
+    // let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
+    // let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
 
     let memory = &dram;
     
     help();
 
-    loop {
-        print!("> ");
-        io::stdout().flush().expect("failed to flush stdout");
+    let mut inst: instruct = instruct::new(1756010927);
+
+    // loop {
+    //     print!("> ");
+    //     io::stdout().flush().expect("failed to flush stdout");
         
-        let cmd: String;
-        let operands: String;
-        scan!("{}({})\n", cmd, operands);
+    //     let cmd: String;
+    //     let operands: String;
+    //     scan!("{}({})\n", cmd, operands);
 
-        match cmd.as_str() {
-            "get" => {
-                // Parse operands
-                let address: u32;
-                scan!(operands.bytes() => "{}", address);
 
-                // Perform operation
-                match memory.borrow_mut().get(address) {
-                    SimResult::Ok(v) => {
-                        println!("Completed in 0 cycles");
-                        println!("{}: {}", address, v);
-                    },
-                    SimResult::Err(e) => eprintln!("Failed to get {}: {}", address, e),
-                    SimResult::Wait(c, v) => {
-                        println!("Completed in {} cycles", c);
-                        println!("{}: {}", address, v);
-                    }
-                };
-            },
-            "set" => {
-                // Parse operands
-                let address: u32;
-                let data: u32;
-                scan!(operands.bytes() => "{}, {}", address, data);
 
-                // Perform operation
-                match memory.set(address, data) {
-                    SimResult::Ok(_v) => {
-                        println!("Completed in 0 cycles");
-                    },
-                    SimResult::Err(e) => eprintln!("Failed to set {}: {}",
-                                                   address, e),
-                    SimResult::Wait(c, _v) => {
-                        println!("Completed in {} cycles", c);
-                    }
-                };
-            },
-            "show" => {
-                // Parse operands
-                let level: String;
-                let address: u32;
-                scan!(operands.bytes() => "{}, {}", level, address);
+    //     match cmd.as_str() {
+    //         "get" => {
+    //             // Parse operands
+    //             let address: u32;
+    //             scan!(operands.bytes() => "{}", address);
 
-                let inspect_res = match level.as_str() {
-                    "L1" => l1_cache.borrow().inspect_address_txt(address),
-                    "L2" => l2_cache.borrow().inspect_address_txt(address),
-                    "L3" => l3_cache.borrow().inspect_address_txt(address),
-                    "DRAM" => dram.borrow().inspect_address_txt(address),
-                    _ => Err(format!("Cache level name \"{}\" not recognized",
-                                     level)),
-                };
+    //             // Perform operation
+    //             let s = memory.get(address);
+    //             match s {
+    //                 SimResult::Ok(v) => {
+    //                     println!("Completed in 0 cycles");
+    //                     println!("{}: {}", address, v);
+    //                 },
+    //                 SimResult::Err(e) => eprintln!("Failed to get {}: {}", address, e),
+    //                 SimResult::Wait(c, v) => {
+    //                     println!("Completed in {} cycles", c);
+    //                     println!("{}: {}", address, v);
+    //                 }
+    //             };
+    //         },
 
-                match inspect_res {
-                    Ok(txt) => {
-                        println!("{} at {}", level, address);
-                        println!("{}", txt);
-                    },
-                    Err(e) => {
-                        eprintln!("Failed to inspect {} at {}: {}", level, address,
-                                  e);
-                    }
-                };
-            },
-            "help" => help(),
-            "exit" => {
-                exit(0);
-            },
-            _ => {
-                eprintln!("Invalid command: {}", cmd);
-                eprintln!("Use help() command to see valid commands");
-            }
-        }
-    }
+    //         "set" => {
+    //             // Parse operands
+    //             let address: u32;
+    //             let data: u32;
+    //             scan!(operands.bytes() => "{}, {}", address, data);
+
+    //             // Perform operation
+    //             match memory.set(address, data) {
+    //                 SimResult::Ok(_v) => {
+    //                     println!("Completed in 0 cycles");
+    //                 },
+    //                 SimResult::Err(e) => eprintln!("Failed to set {}: {}",
+    //                                                address, e),
+    //                 SimResult::Wait(c, _v) => {
+    //                     println!("Completed in {} cycles", c);
+    //                 }
+    //             };
+    //         },
+
+    //         "show" => {
+    //             // Parse operands
+    //             let level: String;
+    //             let address: u32;
+    //             scan!(operands.bytes() => "{}, {}", level, address);
+
+    //             let inspect_res = match level.as_str() {
+    //                 "L1" => l1_cache.borrow().inspect_address_txt(address),
+    //                 "L2" => l2_cache.borrow().inspect_address_txt(address),
+    //                 "L3" => l3_cache.borrow().inspect_address_txt(address),
+    //                 "DRAM" => dram.borrow().inspect_address_txt(address),
+    //                 _ => Err(format!("Cache level name \"{}\" not recognized",
+    //                                  level)),
+    //             };
+
+    //             match inspect_res {
+    //                 Ok(txt) => {
+    //                     println!("{} at {}", level, address);
+    //                     println!("{}", txt);
+    //                 },
+    //                 Err(e) => {
+    //                     eprintln!("Failed to inspect {} at {}: {}", level, address,
+    //                               e);
+    //                 }
+    //             };
+    //         },
+    //         "help" => help(),
+    //         "exit" => {
+    //             exit(0);
+    //         },
+    //         _ => {
+    //             eprintln!("Invalid command: {}", cmd);
+    //             eprintln!("Use help() command to see valid commands");
+    //         }
+    //     }
+    // }
 }
