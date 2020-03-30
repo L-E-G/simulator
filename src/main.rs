@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::cmp::PartialEq;
 use std::fmt::{Debug,Display};
+use std::collections::HashMap;
 
 use text_io::scan;
 
@@ -54,219 +55,75 @@ trait InspectableMemory<A> {
     fn inspect_address_txt(&self, address: A) -> Result<String, String>;
 }
 
-/// Length of cache lines
-const CACHE_LINE_LEN: usize = 4;
-
-/// Simulates the slow DRAM memory. Since data is stored in groups of 4 the lower
-/// 2 bits of each address will be truncated.
+/// Simulates the slow DRAM memory.
 struct DRAM {
-    /// Number of processor cycles it takes to retrieve data.
     delay: u16,
-
-    /// Data in memory stored in a linear form. Since DRAM can be quite large we
-    /// don't want to store all unset addresses. We use a data_table for this.
-    data: Vec<[u32; CACHE_LINE_LEN]>,
-
-    /// Keeps track of the start index in the data field for regions of memory.
-    data_table: Vec<DRAMDataTableEntry>,
-}
-
-/// Entry in the DRAM data_table.
-#[derive(Clone,Copy,PartialEq,Debug)]
-struct DRAMDataTableEntry {
-    /// First address in memory region, inclusive.
-    start_address: u32,
-
-    /// Index in the DRAM data field.
-    data_index: usize,
-
-    /// Length of memory region, inclusive.
-    length: u32,
+    data: HashMap<u32, u32>,
 }
 
 impl DRAM {
     fn new(delay: u16) -> DRAM {
         DRAM{
             delay: delay,
-            data: Vec::new(),
-            data_table: Vec::new(),
+            data: HashMap::new(),
         }
-    }
-
-    /// Returns the data table entry for the specified address. Second entry in
-    /// tuple is the index in the data_table which the entry was found. The address
-    /// argument should already have its lower 2 bits truncated. For internal use.
-    fn data_table_entry(&self, address: u32) -> Option<(DRAMDataTableEntry, usize)> {
-        let mut idx = 0;
-        for entry in self.data_table.iter() {
-            if address >= entry.start_address && address <= (entry.start_address + entry.length) {
-                return Some((*entry, idx));
-            }
-
-            idx += 1;
-        }
-
-        None
     }
 }
 
 impl InspectableMemory<u32> for DRAM {
     fn inspect_txt(&self) -> Result<String, String> {
         let mut out = String::new();
-        out.push_str(format!("Delay: {}", self.delay).as_str());
-        out.push_str("\nData Table:");
 
-        for entry in self.data_table.iter() {
-            out.push_str(format!("\n    Start Address: {}, Data Index: {}, Length: {}",
-                             entry.start_address, entry.data_index, entry.length).as_str());
-        }
-
-        out.push_str("\nData:");
-        let mut idx: usize = 0;
-        while idx < self.data.len() {
-            out.push_str(format!("\n    {}: {:?}", idx, self.data[idx]).as_str());
-            idx += 1;
+        for (k, v) in &self.data {
+            out.push_str(format!("{}: {}\n", k, v).as_str());
         }
 
         Ok(out)
     }
     
     fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
-        let trimmed_address = address >> 2;
-        
-        // Find route_table entry
-        let value = match self.data_table_entry(trimmed_address) {
-            Some((entry, _entry_idx)) => {
-                self.data[entry.data_index + (address as usize)]
-            },
-            None => {
-                [0; 4]
-            },
-        };
-
-        Ok(format!("\
+        match self.data.get(&address) {
+            Some(d) => Ok(format!("\
 Address: {}
-Value  : {:?}", address, value))
+Value  : {}", address, *d)),
+            None => Ok(format!("Does not exist")),
+        }
     }
 }
 
-impl Memory<u32, [u32; CACHE_LINE_LEN]> for DRAM {
-    fn get(&mut self, raw_address: u32) -> SimResult<[u32; CACHE_LINE_LEN], String> {
-        // Truncate lower 2 bits of address since data stored in groups of 4
-        let address = raw_address >> 2;
-        
-        // Find address range in data_table
-        let (range_entry, _idx) = match self.data_table_entry(address) {
-            Some(e) => e,
+impl Memory<u32, u32> for DRAM {
+    fn get(&mut self, address: u32) -> SimResult<u32, String> {
+        match self.data.get(&address) {
+            Some(d) => SimResult::Wait(self.delay, *d),
             None => {
-                // No value explicity stored
-                return SimResult::Wait(self.delay, [0; 4])
-            },
-        };
-
-        // Find value in data array
-        let data_idx = range_entry.data_index + ((range_entry.start_address - address) as usize);
-        SimResult::Wait(self.delay, self.data[data_idx])
+                self.data.insert(address, 0);
+                SimResult::Wait(self.delay, 0)
+            }
+        }
     }
     
-    fn set(&mut self, raw_address: u32, data: [u32; CACHE_LINE_LEN]) -> SimResult<(), String> {
-        // Truncate lower 2 bits of address since data stored in groups of 4
-        let address = raw_address >> 2;
-
-        // Check if address range in data_table
-        let (range_entry, entry_idx) = match self.data_table_entry(address) {
-            Some(d) => d,
-            None => {
-                // No entry, find index to insert entry at
-                let mut insert_idx: usize = 0; // Index to insert entry
-
-                // Index of last data item value for the last entry
-                let mut last_data_idx: usize = 0;
-
-                while insert_idx < self.data_table.len() &&
-                    self.data_table[insert_idx].start_address < address {
-                        
-                    last_data_idx = self.data_table[insert_idx].data_index +
-                        (self.data_table[insert_idx].length as usize) - 1;
-                    insert_idx += 1;
-                }
-
-                // Insert
-                let mut data_insert_idx: usize = 0;
-                if insert_idx > 0 {
-                    // Set the insert idx to 1 past the last item of the last
-                    // data_table entry only if this isn't the first entry in the
-                    // data_table
-                    data_insert_idx = last_data_idx + 1;
-                }
-                
-                self.data_table.insert(insert_idx, DRAMDataTableEntry{
-                    start_address: address,
-                    data_index: data_insert_idx,
-                    length: 0,
-                });
-
-                (self.data_table[insert_idx], insert_idx)
-            },
-        };
-
-        // Insert
-        if range_entry.data_index >= self.data.len() {
-            // If adding onto the end of the data vec, append
-            self.data.push(data);
-        } else {
-            // If inserting into the middle of the data vec, insert
-            self.data.insert(range_entry.data_index, data);
-        }
-        
-        self.data_table[entry_idx].length += 1;
-
-        // Modify other data table entries to account for newly inserted data
-        let mut modify_idx = entry_idx + 1;
-
-        while modify_idx < self.data_table.len() {
-            self.data_table[modify_idx].data_index += 1;
-            
-            modify_idx += 1;
-        }
-        
-        // Coalesce data table entries
-        modify_idx = 0;
-
-        while modify_idx < self.data_table.len() - 1 {
-            let entry = self.data_table[modify_idx];
-            let next_entry = self.data_table[modify_idx + 1];
-
-            if (entry.start_address + entry.length) == next_entry.start_address {
-                self.data_table[modify_idx].length += next_entry.length;
-                self.data_table.remove(modify_idx + 1);
-            }
-
-            modify_idx += 1;
-        }
-
-        // Return
+    fn set(&mut self, address: u32, data: u32) -> SimResult<(), String> {
+        self.data.insert(address, data);
         SimResult::Wait(self.delay, ())
     }
 }
 
-/*
+
 const DM_CACHE_LINES: usize = 1024;
 
 // Direct mapped cache.
-// 2 least significant bits are offset.
-// 10 next least significant bits of an address are the index.
-// 20 most significant bits of an address are the tag.
+// 10 least significant bits of an address are the index.
+// 22 most significant bits of an address are the tag.
 struct DMCache {
     delay: u16,
     lines: [DMCacheLine; DM_CACHE_LINES],
-    base: Rc<RefCell<dyn Memory<u32, [u32; CACHE_LINE_LEN]>>>,
+    base: Rc<RefCell<dyn Memory<u32, u32>>>,
 }
 
 #[derive(Copy,Clone)]
 struct DMCacheLine {
     tag: u32,
-    data: [u32; CACHE_LINE_LEN],
+    data: u32,
     valid: bool,
     dirty: bool,
 }
@@ -275,7 +132,7 @@ impl DMCacheLine {
     fn new() -> DMCacheLine {
         DMCacheLine{
             tag: 0,
-            data: [0; CACHE_LINE_LEN],
+            data: 0,
             valid: false,
             dirty: false,
         }
@@ -283,7 +140,7 @@ impl DMCacheLine {
 }
 
 impl DMCache {
-    fn new(delay: u16, base: Rc<RefCell<dyn Memory<u32, [u32; CACHE_LINE_LEN]>>>) -> DMCache {
+    fn new(delay: u16, base: Rc<RefCell<dyn Memory<u32, u32>>>) -> DMCache {
         let lines = [DMCacheLine::new(); DM_CACHE_LINES];
 
         DMCache{
@@ -293,52 +150,58 @@ impl DMCache {
         }
     }
 
-    fn get_address_offset(&self, address: u32) -> usize {
-        (address & 3) as usize
+    fn get_address_index(&self, address: u32) -> usize {
+        ((address << 22) >> 22) as usize
     }
 
-    fn get_address_index(&self, address: u32) -> usize {
-        ((address & 0xFFC) >> 2) as usize
-    }
-    
     fn get_address_tag(&self, address: u32) -> u32 {
-        address >> 12
+        address >> 10
     }
 }
 
 impl InspectableMemory<u32> for DMCache {
+    fn inspect_txt(&self) -> Result<String, String> {
+        let mut out = String::new();
+
+        for line in self.lines.iter() {
+            if !line.valid {
+                continue;
+            }
+            
+            out.push_str(format!("{} = {} [valid={}, dirty={}]\n",
+                line.tag, line.data, line.valid, line.dirty).as_str());
+        }
+
+        Ok(out)
+    }
+        
     fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
         let idx = self.get_address_index(address);
-        let offset = self.get_address_offset(address);
 
         let line = self.lines[idx];
 
         Ok(format!("\
-Index : {}
-Tag   : {}
-Offset: {}
-Data  : {:?}
-Valid : {}
-Dirty : {}", idx, line.tag, offset, line.data, line.valid, line.dirty))
+Index: {}
+Tag  : {}
+Data : {}
+Valid: {}
+Dirty: {}", idx,
+                   line.tag, line.data, line.valid, line.dirty))
     }
 }
 
 impl Memory<u32, u32> for DMCache {
-    // TODO: Make DMCache.{get,set} use offset
-    // TODO: Make DMCache.{get,set} use base as Memory<u32, [u32; CACHE_LINE_LEN]>
     fn get(&mut self, address: u32) -> SimResult<u32, String> {
-        // Extract components from address
+        // Get line
         let idx = self.get_address_index(address);
         let tag = self.get_address_tag(address);
-        let offset = self.get_address_offset(address);
 
         let line = self.lines[idx];
 
-        // Cache hit
+        // Check if address in cache
         if line.valid && line.tag == tag {
-            SimResult::Wait(self.delay, line.data[offset])
-        } else { // Cache miss
-            // Record total cycles used in servicing miss
+            SimResult::Wait(self.delay, line.data)
+        } else {
             let mut total_wait: u16 = self.delay;
             
             // Evict current line if dirty and there is a conflict
@@ -347,7 +210,7 @@ impl Memory<u32, u32> for DMCache {
                 let evict_res = self.base.borrow_mut().set(address, line.data);
 
                 if let SimResult::Err(e) = evict_res {
-                    return SimResult::Err(format!("failed to write out conflicting line when evicting: {}", e));
+                    return SimResult::Err(format!("failed to write out old line value when evicting: {}", e));
                 }
 
                 if let SimResult::Wait(c, _r) = evict_res {
@@ -359,14 +222,14 @@ impl Memory<u32, u32> for DMCache {
             let get_res = self.base.borrow_mut().get(address);
 
             let data = match get_res {
-                SimResult::Err(e) => {
-                    return SimResult::Err(format!("failed to get line value from base cache: {}", e));
-                },
                 SimResult::Wait(w, d) => {
                     total_wait += w;
                     
                     d
-                }
+                },
+                SimResult::Err(e) => {
+                    return SimResult::Err(format!("failed to get line value from base cache: {}", e));
+                },
             };
 
             // Save in cache
@@ -420,7 +283,6 @@ impl Memory<u32, u32> for DMCache {
         }
     }
 }
-*/
 
 fn help() {
     println!("Commands:
@@ -429,21 +291,16 @@ fn help() {
 - help(): Show this help text
 - get(address): Load address from memory
 - set(address, data): Write data to address in memory
-- show(level, address): Show an address's cache line, level can be: L1, L2, L3, DRAM");
+- show(level, address): Show an address's cache line, level can be: L1, L2, L3, DRAM. If address is \"_\" the entire level will be shown");
 }
 
 fn main() {
-    // TODO: Figure out why set(5, x), set(6, x), get(5) == 6, get(6) == 6, but 5 and 6 get placed in different DRAM.data indexes, is this bc the mechanism hasn't quite been refactored to store 4 values in each index? I thought truncating first 2 bits of address would do this, investigate...
-    // TODO: line length 4
     let dram = Rc::new(RefCell::new(DRAM::new(100)));
-    /*
     let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
     let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
     let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
-*/
 
-    //let memory = &l1_cache;
-    let memory = &dram;
+    let memory = &l1_cache;
     
     help();
 
@@ -478,7 +335,7 @@ fn main() {
                 scan!(operands.bytes() => "{}, {}", address, data);
 
                 // Perform operation
-                match memory.borrow_mut().set(address, [data; 4]) {
+                match memory.borrow_mut().set(address, data) {
                     SimResult::Err(e) => eprintln!("Failed to set {}: {}",
                                                    address, e),
                     SimResult::Wait(c, _v) => {
@@ -495,32 +352,33 @@ fn main() {
                 let inspect_res = match address_str.as_str() {
                     "_" => {
                         match level.as_str() {
+                            "L1" => l1_cache.borrow().inspect_txt(),
+                            "L2" => l2_cache.borrow().inspect_txt(),
+                            "L3" => l3_cache.borrow().inspect_txt(),
                             "DRAM" => dram.borrow().inspect_txt(),
-                            _ => Err(format!("Cache level name \"{}\" not recognized", level)),
+                            _ => Err(format!("Cache level name \"{}\" not \
+                                recognized", level)),
                         }
                     },
-                    _ => Err(format!("Specific address show not supported at this time")),
-                    /*
                     _ => {
-                        let address: u32 = match address_str.parse() {
-                            Err(e) => {
-                                return Err(format!("Failed to parse address argument {} as u32: {}", address_str, e));
-                            },
-                            Ok(v) => v,
-                        };
-                        
-                        match level.as_str() {
-                            /*
-                            "L1" => l1_cache.borrow().inspect_address_txt(address),
-                            "L2" => l2_cache.borrow().inspect_address_txt(address),
-                            "L3" => l3_cache.borrow().inspect_address_txt(address),
-*/
-                            "DRAM" => dram.borrow().inspect_address_txt(address),
-                            _ => Err(format!("Cache level name \"{}\" not recognized",
-                                             level)),
+                        match address_str.parse() {
+                            Err(e) => Err(format!("Failed to parse address argument {} as u32: {}", address_str, e)),
+                            Ok(address) => {
+                                match level.as_str() {
+                                    "L1" => l1_cache.borrow()
+                                        .inspect_address_txt(address),
+                                    "L2" => l2_cache.borrow()
+                                        .inspect_address_txt(address),
+                                    "L3" => l3_cache.borrow()
+                                        .inspect_address_txt(address),
+                                    "DRAM" => dram.borrow()
+                                        .inspect_address_txt(address),
+                                    _ => Err(format!("Cache level name \"{}\" not \
+                                                      recognized", level)),
+                                }
+                            }
                         }
                     },
-*/
                 };
 
                 match inspect_res {
@@ -544,269 +402,4 @@ fn main() {
             }
         }
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Test the dram.get method.
-    #[test]
-    fn test_dram_get() {
-        const DELAY: u16 = 100;
-        let mut dram = DRAM::new(DELAY);
-
-        // Manually assemble data_table
-        const ADDR_A: u32 = 0;
-        const VAL_A: [u32; CACHE_LINE_LEN] = [111; CACHE_LINE_LEN];
-        const IDX_A: usize = 0;
-        const ENTRY_A: DRAMDataTableEntry = DRAMDataTableEntry{
-            start_address: ADDR_A >> 2,
-            data_index: IDX_A,
-            length: 1,
-        };
-        dram.data_table.push(ENTRY_A);
-        dram.data.push(VAL_A);
-        
-        const ADDR_B: u32 = 8;
-        const VAL_B: [u32; CACHE_LINE_LEN] = [222; CACHE_LINE_LEN];
-        const IDX_B: usize = 1;
-        const ENTRY_B: DRAMDataTableEntry = DRAMDataTableEntry{
-            start_address: ADDR_B >> 2,
-            data_index: IDX_B,
-            length: 1,
-        };
-        dram.data_table.push(ENTRY_B);
-        dram.data.push(VAL_B);
-        
-        const ADDR_C1: u32 = 16;
-        const ADDR_C2: u32 = 17;
-        const VAL_C1: [u32; CACHE_LINE_LEN] = [333; CACHE_LINE_LEN];
-        const VAL_C2: [u32; CACHE_LINE_LEN] = [444; CACHE_LINE_LEN];
-        const IDX_C1: usize = 2;
-        const IDX_C2: usize = 3;
-        const ENTRY_C: DRAMDataTableEntry = DRAMDataTableEntry{
-            start_address: ADDR_C1 >> 2,
-            data_index: IDX_C1,
-            length: 2,
-        };
-        dram.data_table.push(ENTRY_C);
-        dram.data.push(VAL_C1);
-        dram.data.push(VAL_C2);
-
-        // Test
-        assert_eq!(dram.get(ADDR_A), SimResult::Wait(DELAY, VAL_A));
-        assert_eq!(dram.get(ADDR_B), SimResult::Wait(DELAY, VAL_B));
-        assert_eq!(dram.get(ADDR_C1), SimResult::Wait(DELAY, VAL_C1));
-        assert_eq!(dram.get(ADDR_C2), SimResult::Wait(DELAY, VAL_C2));
-    }
-
-    /// Tests the dram.data_table_entry() helper. This function is used in both the
-    /// dram.{get(),set()} methods.
-    #[test]
-    fn test_dram_data_table_entry_helper() {
-        let mut dram = DRAM::new(100);
-
-        // Manually assemble data_table
-        const ADDR_A: u32 = 0;
-        const IDX_A: usize = 0;
-        const ENTRY_A: DRAMDataTableEntry = DRAMDataTableEntry{
-            start_address: ADDR_A >> 2,
-            data_index: IDX_A,
-            length: 1,
-        };
-        dram.data_table.push(ENTRY_A);
-        
-        const ADDR_B: u32 = 8;
-        const IDX_B: usize = 1;
-        const ENTRY_B: DRAMDataTableEntry = DRAMDataTableEntry{
-            start_address: ADDR_B >> 2,
-            data_index: IDX_B,
-            length: 1,
-        };
-        dram.data_table.push(ENTRY_B);
-        
-        const ADDR_C: u32 = 16;
-        const IDX_C: usize = 2;
-        const ENTRY_C: DRAMDataTableEntry = DRAMDataTableEntry{
-            start_address: ADDR_C >> 2,
-            data_index: IDX_C,
-            length: 1,
-        };
-        dram.data_table.push(ENTRY_C);
-
-        // Test
-        assert_eq!(dram.data_table_entry(ADDR_A >> 2), Some((ENTRY_A, 0)));
-        assert_eq!(dram.data_table_entry(ADDR_B >> 2), Some((ENTRY_B, 1)));
-        assert_eq!(dram.data_table_entry(ADDR_C >> 2), Some((ENTRY_C, 2)));
-    }
-
-    #[test]
-    fn test_dram_data_table_entries() {
-        let mut dram = DRAM::new(100);
-
-        // Ensure data_table entries are created for 2 addresses far apart
-        const ADDR_A: u32 = 5;
-        const VAL_A: [u32; 4] = [6; 4];
-        
-        const ADDR_B: u32 = 500;
-        const VAL_B: [u32; 4] = [666; 4];
-        
-        dram.set(ADDR_A, VAL_A).unwrap("Failed to set a");
-        dram.set(ADDR_B, VAL_B).unwrap("Failed to set b");
-
-        assert_eq!(dram.data_table.len(), 2, "Data table length");
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_A >> 2,
-            data_index: 0,
-            length: 1,
-        }, "Data table entry for A");
-        assert_eq!(dram.data_table[1], DRAMDataTableEntry{
-            start_address: ADDR_B >> 2,
-            data_index: 1,
-            length: 1,
-        }, "Data table entry for B");
-
-        assert_eq!(dram.get(ADDR_A).unwrap("Failed to get a").1, VAL_A,
-                   "Value for A");
-        assert_eq!(dram.get(ADDR_B).unwrap("Failed to get b").1, VAL_B,
-                   "Value for B");
-
-        // Ensure data_table entries are created for in the middle
-        const ADDR_C: u32 = 250;
-        const VAL_C: [u32; 4] = [333; 4];
-
-        dram.set(ADDR_C, VAL_C).unwrap("Failed to set c");
-
-        assert_eq!(dram.data_table.len(), 3, "Data table length");
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_A >> 2,
-            data_index: 0,
-            length: 1,
-        }, "Data table entry for A");
-        assert_eq!(dram.data_table[1], DRAMDataTableEntry{
-            start_address: ADDR_C >> 2,
-            data_index: 1,
-            length: 1,
-        }, "Data table entry for C");
-        assert_eq!(dram.data_table[2], DRAMDataTableEntry{
-            start_address: ADDR_B >> 2,
-            data_index: 2,
-            length: 1,
-        }, "Data table entry for B");
-
-        assert_eq!(dram.get(ADDR_A).unwrap("Failed to get a").1, VAL_A,
-                   "Value for A");
-        assert_eq!(dram.get(ADDR_B).unwrap("Failed to get b").1, VAL_B,
-                   "Value for B");
-        assert_eq!(dram.get(ADDR_C).unwrap("Failed to get c").1, VAL_C,
-                   "Value for C");
-    }
-
-    /// Tests the case where data table entries are covering one low and high index
-    /// and then a value is inserted in the middle which should cause all the
-    /// entries to collapse into one.
-    #[test]
-    fn test_dram_data_table_coalesce_collapse() {
-        let mut dram = DRAM::new(100);
-
-        const ADDR_LOW: u32 = 0;
-        const VAL_LOW: [u32; 4] = [1; 4];
-        
-        const ADDR_MIDDLE: u32 = 4;
-        const VAL_MIDDLE: [u32; 4] = [2; 4];
-        
-        const ADDR_HIGH: u32 = 8;
-        const VAL_HIGH: [u32; 4] = [3; 4];
-
-        // Set low an high indexes
-        dram.set(ADDR_LOW, VAL_LOW).unwrap("Failed to set low");
-        dram.set(ADDR_HIGH, VAL_HIGH).unwrap("Failed to set high");
-        println!("set: low, high: {:?}", dram.data);
-
-        assert_eq!(dram.data_table.len(), 2, "Data table length");
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_LOW >> 2,
-            data_index: 0,
-            length: 1,
-        }, "Data table entry for low");
-        assert_eq!(dram.data_table[1], DRAMDataTableEntry{
-            start_address: ADDR_HIGH >> 2,
-            data_index: 1,
-            length: 1,
-        }, "Data table entry for high");
-
-        assert_eq!(dram.get(ADDR_LOW).unwrap("Failed to get low").1, VAL_LOW,
-                   "Value for low");
-        assert_eq!(dram.get(ADDR_HIGH).unwrap("Failed to get high").1, VAL_HIGH,
-                   "Value for high");
-
-        // Make coalesce occur by setting middle index
-        dram.set(ADDR_MIDDLE, VAL_MIDDLE).unwrap("Failed to set middle");
-        println!("set: low, middle, high: {:?}", dram.data);
-
-        assert_eq!(dram.data_table.len(), 1, "Data table length");
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_LOW >> 2,
-            data_index: 0,
-            length: 3,
-        }, "Data table entry for all");
-
-        assert_eq!(dram.get(ADDR_LOW).unwrap("Failed to get low").1, VAL_LOW,
-                   "Value for low");
-        assert_eq!(dram.get(ADDR_MIDDLE).unwrap("Failed to get middle").1,
-                   VAL_MIDDLE, "Value for middle");
-        assert_eq!(dram.get(ADDR_HIGH).unwrap("Failed to get high").1, VAL_HIGH,
-                   "Value for high");
-    }
-
-    /// Tests data table entries where a low address is inserted, then a middle
-    /// address. At this point the first data table entry should take on this
-    /// middle address. Then a high address in inserted, causing the entry to take
-    /// on the third address.
-    #[test]
-    fn dram_data_table_coalesce_low_high() {
-        let mut dram = DRAM::new(100);
-        
-        const ADDR_LOW: u32 = 0;
-        const VAL_LOW: [u32; 4] = [1; 4];
-        
-        const ADDR_MIDDLE: u32 = 4;
-        const VAL_MIDDLE: [u32; 4] = [2; 4];
-        
-        const ADDR_HIGH: u32 = 8;
-        const VAL_HIGH: [u32; 4] = [3; 4];
-
-        // Insert low
-        dram.set(ADDR_LOW, VAL_LOW).unwrap("Failed to set low");
-
-        assert_eq!(dram.data_table.len(), 1);
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_LOW >> 2,
-            data_index: 0,
-            length: 1,
-        }, "Data table entry for low");
-
-        // Insert middle
-        dram.set(ADDR_MIDDLE, VAL_MIDDLE).unwrap("Failed to set middle");
-
-        assert_eq!(dram.data_table.len(), 1);
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_LOW >> 2,
-            data_index: 0,
-            length: 2,
-        }, "Data table entry for low and middle");
-
-        // Insert high
-        dram.set(ADDR_HIGH, VAL_HIGH).unwrap("Failed to set high");
-
-        assert_eq!(dram.data_table.len(), 1);
-        assert_eq!(dram.data_table[0], DRAMDataTableEntry{
-            start_address: ADDR_LOW >> 2,
-            data_index: 0,
-            length: 3,
-        }, "Data table entry for low, middle, and high");
-    }
-
-    // TODO: Write data_table coalesce test, write insert in middle of range test
 }
