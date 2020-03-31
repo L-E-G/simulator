@@ -4,28 +4,25 @@ use std::rc::Rc;
 use crate::result::SimResult;
 use crate::memory::{Memory,Registers};
 
-pub struct load {
+pub struct Load {
     dest: usize,
     addr: u32,
     value: u32,
 }
 
-impl load {
-    pub fn new() -> load {
-        load{
+impl Load {
+    pub fn new() -> Load {
+        Load{
             dest: 0,
             addr: 0,
             value: 0,
         }
     }
-
-
 }
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
 pub trait Instruction {
-
     /// Extracts parameters from instruction bits and stores them in the
     /// implementing struct for use by future stages. It also retrieves register
     /// values if necessary and does the same.
@@ -41,7 +38,7 @@ pub trait Instruction {
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String>;
 }
 
-impl Instruction for load {
+impl Instruction for Load {
     fn decode_and_fetch(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
         let mut instString: String = instruction.to_string();
         let mut inststr: &str = &instString[..];
@@ -72,5 +69,37 @@ impl Instruction for load {
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         registers[self.dest] = self.value;
         return SimResult::Wait(0, ());
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    
+    /// Ensures that the load instruction functions correctly.
+    #[test]
+    fn test_load_instruction() {
+        // Pack instruction bits
+        // dest = 10100 = R20
+        // addr = 00110 = R6
+        const DEST_REG_IDX: usize = 20;
+        const ADDR_REG_IDX: usize = 6;
+        const instruction: u32 = ((ADDR_REG_IDX as u32) << 14) |
+        ((DEST_REG_IDX as u32) << 9);
+
+        // Setup registers
+        let mut regs = Registers::new();
+
+        const DEST_VAL: u32 = 444;
+        const ADDR_VAL: u32 = 777;
+        regs[DEST_REG_IDX] = DEST_VAL;
+        regs[ADDR_REG_IDX] = ADDR_VAL;
+
+        // Decode and fetch
+        let mut load_instruction = Load::new();
+        assert_eq!(load_instruction.decode_and_fetch(instruction, &mut regs),
+                   SimResult::Wait(0, ()), "decode_and_fetch result");
+        assert_eq!(load_instruction.dest, DEST_VAL as usize, "instruction.dest");
+        assert_eq!(load_instruction.addr, ADDR_VAL, "instruction.addr");
     }
 }
