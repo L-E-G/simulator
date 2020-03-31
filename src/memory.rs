@@ -355,7 +355,6 @@ impl Memory<u32, u32> for DMCache {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::env::current_dir;
 
     /// Tests the DRAM.load_from_file method.
     #[test]
