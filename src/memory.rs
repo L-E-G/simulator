@@ -19,6 +19,7 @@ const REGISTERS_SIZE: usize = 32;
 /// - 29: Status
 /// - 30: Stack pointer
 /// - 31: Subroutine link return address
+#[derive(Clone,Debug,PartialEq)]
 pub struct Registers {
     /// Holds register values
     file: [u32; REGISTERS_SIZE],

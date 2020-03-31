@@ -10,7 +10,7 @@ pub trait Instruction {
     /// Extracts parameters from instruction bits and stores them in the
     /// implementing struct for use by future stages. It also retrieves register
     /// values if necessary and does the same.
-    fn decode_and_fetch(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String>;
+    fn decode_and_fetch(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String>;
 
     /// Executes the instruction.
     fn execute(&mut self) -> SimResult<(), String>;
@@ -35,6 +35,7 @@ pub struct Load {
 }
 
 impl Load {
+    /// Creates an empty load instruction.
     pub fn new() -> Load {
         Load{
             dest_reg: 0,
@@ -46,7 +47,7 @@ impl Load {
 
 impl Instruction for Load {
     /// Extract dest_reg and mem_addr operands.
-    fn decode_and_fetch(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
+    fn decode_and_fetch(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
         self.dest_reg = (((instruction) << 17) >> 26) as usize;
         self.mem_addr = registers[((instruction << 12) >> 26) as usize];
         
@@ -78,73 +79,56 @@ impl Instruction for Load {
     }
 }
 
-/*
+/// Writes a value in memory from a register.
 struct Store {
-    src_reg: usize,
-    addr: u32,
+    /// Address in memory to save value.
+    dest_addr: u32,
+
+    /// Value in register to save in memory.
     value: u32,
 }
 
 impl Store {
+    /// Create an empty store instruction.
     pub fn new() -> Store {
         Store{
-            src_reg: 0,
-            addr: 0,
+            dest_addr: 0,
             value: 0,
         }
     }
 }
 
 impl Instruction for Store {
-    /// Convert instruction to String, then to &str so we can convert it to a usize
-    /// so that we can perform binary operations on it.
-    /// Extract DRAM address from instruction.
-    /// Extract register from instruction.
-    /// Get value to be added to DRAM from register.
-    fn decode_and_fetch(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
-        }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+    /// Extract operands and retrieve value to save in memory from registers.
+    fn decode_and_fetch(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.value = registers[((instruction << 17) >> 26) as usize];
+        self.dest_addr = registers[((instruction << 12) >> 26) as usize];
 
-        self.addr = ((instbin << 14) >> 31) as u32;
-
-        self.src_reg = (instbin << 9) >> 31;
-
-        self.value = registers[self.src_reg];
-        return SimResult::Wait(0, ());
+        SimResult::Wait(0, ())
     }
 
-    /// Skip, will not need this since we are only accessing memory.
+    /// No execution stage.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
-    /// Call set from DRAM witht he value we want to add to DRAM. 
+    /// Set address in memory to value.
     fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
-        let mut wait = 0;
- 
-        match memory.borrow_mut().set(self.addr, self.value) {
-            SimResult::Err(e) => return SimResult::Err(e),
-            SimResult::Wait(c, _v) => {
-                wait += c;
-
-            }
-        };
-        return SimResult::Wait(wait, ());
+        println!("set({}, {}", self.dest_addr, self.value);
+        match memory.borrow_mut().set(self.dest_addr, self.value) {
+            SimResult::Err(e) => SimResult::Err(
+                format!("Failed to store value in {}: {}", self.dest_addr, e)),
+            SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
+        }
     }
 
-    /// Skip, no write back to register.
+    /// No write back stage.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        return SimResult::Wait(0, ());
+        SimResult::Wait(0, ())
     }
 }
 
-
+/*
 struct Move {
     dest: usize,
     src_reg: usize,
@@ -307,37 +291,90 @@ mod tests {
         // Setup registers
         const DEST_VAL: usize = 444;
         const ADDR_VAL: u32 = 777;
-        regs[DEST_REG_IDX] = DEST_VAL as u32;
         regs[ADDR_REG_IDX] = ADDR_VAL;
 
         // Setup memory
         const MEM_DELAY: u16 = 101;
         const MEM_VALUE: u32 = 567;
         
-        // Decode and fetch
-        assert_eq!(load_instruction.decode_and_fetch(instruction, &mut regs),
+        // Test decode and fetch
+        assert_eq!(load_instruction.decode_and_fetch(instruction, &regs),
                    SimResult::Wait(0, ()), "decode_and_fetch() == expected");
         assert_eq!(load_instruction.dest_reg, DEST_REG_IDX,
                    ".dest_reg == expected");
         assert_eq!(load_instruction.mem_addr, ADDR_VAL,
                    ".mem_addr == expected");
 
-        // Execute
+        // Test execute
         assert_eq!(load_instruction.execute(), SimResult::Wait(0, ()),
                    "execute() == expected");
 
-        // Access memory
+        // Test access memory
         scenario.expect(memory_handle.get(ADDR_VAL)
                         .and_return(SimResult::Wait(MEM_DELAY, MEM_VALUE)));
-        assert_eq!(load_instruction.access_memory(memory_ref.clone()),
+        assert_eq!(load_instruction.access_memory(memory_ref),
                    SimResult::Wait(MEM_DELAY, ()), "access_memory() == expected");
         assert_eq!(load_instruction.value, MEM_VALUE,
                    ".value == expected");
 
-        // Write back
+        // Test write back
+        let mut expected_wb_regs = regs.clone();
+        expected_wb_regs[DEST_REG_IDX] = MEM_VALUE;
+        
         assert_eq!(load_instruction.write_back(&mut regs),
                    SimResult::Wait(0, ()), "write_back() == expected");
-        assert_eq!(regs[DEST_REG_IDX], MEM_VALUE,
-                   "regs[DEST_REG_IDX] == expected");
+        assert_eq!(regs, expected_wb_regs,
+                   "regs == expected");
+    }
+
+    /// Ensures the store instruction functions properly
+    #[test]
+    fn test_store_instruction() {
+        let scenario = Scenario::new();
+
+        let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let memory_ref = Rc::new(RefCell::new(memory));
+        
+        let mut regs = Registers::new();
+        let mut store_instruction = Store::new();
+
+        // Pack instruction operands
+        // src = 00101 = R5
+        // addr = 01000 = R8
+        const SRC_REG_IDX: usize = 5;
+        const ADDR_REG_IDX: usize = 8;
+        const instruction: u32 = ((SRC_REG_IDX << 9) | (ADDR_REG_IDX << 14)) as u32;
+
+        // Setup registers
+        const DEST_ADDR: u32 = 34567;
+        const SRC_VAL: u32 = 346;
+
+        regs[SRC_REG_IDX] = SRC_VAL;
+        regs[ADDR_REG_IDX] = DEST_ADDR;
+
+        // Test decode and fetch
+        assert_eq!(store_instruction.decode_and_fetch(instruction, &regs),
+                   SimResult::Wait(0, ()), "decode_and_fetch() == expected");
+        assert_eq!(store_instruction.value, SRC_VAL, ".value == expected");
+        assert_eq!(store_instruction.dest_addr, DEST_ADDR,
+                   ".dest_addr == expected");
+
+        // Test execute
+        assert_eq!(store_instruction.execute(), SimResult::Wait(0, ()),
+                   "execute() == expected");
+
+        // Test access memory
+        const MEM_DELAY: u16 = 45;
+        scenario.expect(memory_handle.set(DEST_ADDR, SRC_VAL)
+                        .and_return(SimResult::Wait(MEM_DELAY, ())));
+        assert_eq!(store_instruction.access_memory(memory_ref),
+                   SimResult::Wait(MEM_DELAY, ()));
+
+        // Test write back
+        let expected_wb_regs = regs.clone();
+        
+        assert_eq!(store_instruction.write_back(&mut regs),
+                   SimResult::Wait(0,()), "write_back == expected");
+        assert_eq!(regs, expected_wb_regs, "regs == expected");
     }
 }
