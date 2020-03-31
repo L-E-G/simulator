@@ -305,16 +305,26 @@ mod tests {
         // Setup registers
         let mut regs = Registers::new();
 
-        const DEST_VAL: u32 = 444;
+        const DEST_VAL: usize = 444;
         const ADDR_VAL: u32 = 777;
-        regs[DEST_REG_IDX] = DEST_VAL;
+        regs[DEST_REG_IDX] = DEST_VAL as u32;
         regs[ADDR_REG_IDX] = ADDR_VAL;
 
         // Decode and fetch
         let mut load_instruction = Load::new();
+        
         assert_eq!(load_instruction.decode_and_fetch(instruction, &mut regs),
                    SimResult::Wait(0, ()), "decode_and_fetch result");
-        assert_eq!(load_instruction.dest, DEST_VAL as usize, "instruction.dest");
+        assert_eq!(load_instruction.dest, DEST_VAL, "instruction.dest");
         assert_eq!(load_instruction.addr, ADDR_VAL, "instruction.addr");
+
+        // Execute
+        assert_eq!(load_instruction.execute(), SimResult::Wait(0, ()),
+                   "execute result");
+
+        // TODO: Use mock library to test if correct memory calls are made
+        // TODO: Test rest of Load instruction
     }
+
+    // TODO: Test rest of instructions
 }
