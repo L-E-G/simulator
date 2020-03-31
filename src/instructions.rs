@@ -4,74 +4,6 @@ use std::rc::Rc;
 use crate::result::SimResult;
 use crate::memory::{Memory,Registers};
 
-pub struct Load {
-    dest: usize,
-    addr: u32,
-    value: u32,
-}
-
-impl Load {
-    pub fn new() -> Load {
-        Load{
-            dest: 0,
-            addr: 0,
-            value: 0,
-        }
-    }
-}
-
-struct Store {
-    src_reg: usize,
-    addr: u32,
-    value: u32,
-}
-
-impl Store {
-    pub fn new() -> Store {
-        Store{
-            src_reg: 0,
-            addr: 0,
-            value: 0,
-        }
-    }
-}
-
-struct Move {
-    dest: usize,
-    src_reg: usize,
-    value: u32,
-}
-
-impl Move {
-    pub fn new() -> Move {
-        Move{
-            dest: 0,
-            src_reg: 0,
-            value: 0,
-        }
-    }
-}
-
-struct AddUIImm {
-    dest: usize,
-    src_reg: usize,
-    op1: usize,
-    op2: usize,
-    result: u32,
-}
-
-impl AddUIImm {
-    pub fn new() -> AddUIImm {
-        AddUIImm{
-            dest: 0,
-            src_reg: 0,
-            op1: 0,
-            op2: 0,
-            result: 0,
-        }
-    }
-}
-
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
 pub trait Instruction {
@@ -90,51 +22,75 @@ pub trait Instruction {
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String>;
 }
 
-impl Instruction for Load {
-    /// Convert instruction to String, then to &str so we can convert it to a usize
-    /// so that we can perform binary operations on it.
-    /// Extract address to load from.
-    /// Extract destination register to load into.
-    fn decode_and_fetch(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
+/// Read a value from an address in memory and place it in a register.
+pub struct Load {
+    /// Register to place value from memory.
+    dest_reg: usize,
+
+    /// Memory address to load into register.
+    mem_addr: u32,
+
+    /// Value loaded from mememory during access_memory.
+    value: u32,
+}
+
+impl Load {
+    pub fn new() -> Load {
+        Load{
+            dest_reg: 0,
+            mem_addr: 0,
+            value: 0,
         }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+    }
+}
 
-        self.addr = ((instbin << 14) >> 31) as u32;
-
-        self.dest = (instbin << 9) >> 31;
+impl Instruction for Load {
+    /// Extract dest_reg and mem_addr operands.
+    fn decode_and_fetch(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
+        self.dest_reg = (((instruction) << 17) >> 26) as usize;
+        self.mem_addr = registers[((instruction << 12) >> 26) as usize];
+        
         return SimResult::Wait(0, ());
     }
 
-    /// Skip since we are making a memory access.
+    /// No execute step.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
-    /// Call to DRAM to get value as specified address.
-    /// Set value to be the value we got from DRAM.
+    /// Load value at mem_addr from memory into value.
     fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
-        let mut wait = 0;
-
-        match memory.borrow_mut().get(self.addr) {
-            SimResult::Err(e) => return SimResult::Err(e),
-            SimResult::Wait(c, v) => {
-                self.value = v;
-                wait += c;
-            }
-        };
-        return SimResult::Wait(wait, ());
+        match memory.borrow_mut().get(self.mem_addr) {
+            SimResult::Err(e) => SimResult::Err(
+                format!("failed to retrieve memory address {}: {}",
+                        self.mem_addr, e)),
+            SimResult::Wait(wait, val) => {
+                self.value = val;
+                SimResult::Wait(wait, ())
+            },
+        }
     }
 
-    /// Set the value of that register to the value from DRAM.
+    /// Write value from memory into register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        registers[self.dest] = self.value;
-        return SimResult::Wait(0, ());
+        registers[self.dest_reg] = self.value;
+        SimResult::Wait(0, ())
+    }
+}
+
+struct Store {
+    src_reg: usize,
+    addr: u32,
+    value: u32,
+}
+
+impl Store {
+    pub fn new() -> Store {
+        Store{
+            src_reg: 0,
+            addr: 0,
+            value: 0,
+        }
     }
 }
 
@@ -187,6 +143,23 @@ impl Instruction for Store {
     }
 }
 
+
+struct Move {
+    dest: usize,
+    src_reg: usize,
+    value: u32,
+}
+
+impl Move {
+    pub fn new() -> Move {
+        Move{
+            dest: 0,
+            src_reg: 0,
+            value: 0,
+        }
+    }
+}
+
 impl Instruction for Move {
     /// Convert instruction to String, then to &str so we can convert it to a usize
     /// so that we can perform binary operations on it.
@@ -225,6 +198,26 @@ impl Instruction for Move {
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         registers[self.dest] = self.value;
         return SimResult::Wait(0, ());
+    }
+}
+
+struct AddUIImm {
+    dest: usize,
+    src_reg: usize,
+    op1: usize,
+    op2: usize,
+    result: u32,
+}
+
+impl AddUIImm {
+    pub fn new() -> AddUIImm {
+        AddUIImm{
+            dest: 0,
+            src_reg: 0,
+            op1: 0,
+            op2: 0,
+            result: 0,
+        }
     }
 }
 
@@ -299,8 +292,7 @@ mod tests {
         // addr = 00110 = R6
         const DEST_REG_IDX: usize = 20;
         const ADDR_REG_IDX: usize = 6;
-        const instruction: u32 = ((ADDR_REG_IDX as u32) << 14) |
-        ((DEST_REG_IDX as u32) << 9);
+        const instruction: u32 = ((ADDR_REG_IDX as u32) << 14) | ((DEST_REG_IDX as u32) << 9);
 
         // Setup registers
         let mut regs = Registers::new();
@@ -315,8 +307,10 @@ mod tests {
         
         assert_eq!(load_instruction.decode_and_fetch(instruction, &mut regs),
                    SimResult::Wait(0, ()), "decode_and_fetch result");
-        assert_eq!(load_instruction.dest, DEST_VAL, "instruction.dest");
-        assert_eq!(load_instruction.addr, ADDR_VAL, "instruction.addr");
+        assert_eq!(load_instruction.dest_reg, DEST_REG_IDX,
+                   "instruction.dest_reg == expected");
+        assert_eq!(load_instruction.mem_addr, ADDR_VAL,
+                   "instruction.mem_addr == expected");
 
         // Execute
         assert_eq!(load_instruction.execute(), SimResult::Wait(0, ()),
@@ -325,6 +319,4 @@ mod tests {
         // TODO: Use mock library to test if correct memory calls are made
         // TODO: Test rest of Load instruction
     }
-
-    // TODO: Test rest of instructions
 }
