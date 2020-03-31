@@ -1,6 +1,9 @@
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::io::{Read,BufReader};
+use std::fs::File;
+use std::path::Path;
 
 use crate::result::SimResult;
 
@@ -44,8 +47,12 @@ pub trait Memory<A, D> {
 }
 
 /// InspectableMemory allows a memory unit to be insepcted for user
-/// interface purposes. A is the address type.
-pub trait InspectableMemory<A> {
+/// interface purposes. A is the address type. D is the data type.
+pub trait InspectableMemory<A, D> {
+    /// Returns a map of all a memory's contents. Where keys are addresses and
+    /// values are memory values.
+    fn inspect(&self) -> Result<HashMap<A, D>, String>;
+    
     /// Returns a text description of the entire data structure.
     fn inspect_txt(&self) -> Result<String, String>;
     
@@ -66,9 +73,58 @@ impl DRAM {
             data: HashMap::new(),
         }
     }
+
+    /// Loads contents of a file into DRAM.
+    /// The file should be a binary file. Every 32 bits will be loaded in as a word
+    /// in memory. The address in memory will increment by 1 for word loaded.
+    pub fn load_from_file(&mut self, file_p: &str) -> Result<(), String> {
+        // Read file
+        let file = match File::open(file_p) {
+            Ok(f) => f,
+            Err(e) => {
+                return Err(format!("Failed to open DRAM file \"{}\": {}",
+                                   file_p, e));
+            },
+        };
+
+        let mut reader = BufReader::new(file);
+
+        let mut addr: u32 = 0;
+        let mut buf: [u8; 4] = [0; 4];
+
+        loop {
+            match reader.read(&mut buf) {
+                Ok(bytes_read) => {
+                    if bytes_read == 0 { // End of file
+                        return Ok(());
+                    } else if bytes_read != 4 { // Incorrect number of bytes read
+                        return Err(format!("Read {} bytes from DRAM file \"{}\" \
+                                            but expected 4 bytes",
+                                           bytes_read, file_p));
+                    }
+
+                    let value: u32 = (buf[3] as u32) |
+                        (buf[2] as u32) << 8 |
+                        (buf[1] as u32) << 16 |
+                        (buf[0] as u32) << 24;
+                    
+                    self.data.insert(addr, value);
+                    addr += 1;
+                },
+                Err(e) => {
+                    return Err(format!("Failed to read DRAM file \"{}\": {}",
+                                       file_p, e));
+                },
+            }
+        }
+    }
 }
 
-impl InspectableMemory<u32> for DRAM {
+impl InspectableMemory<u32, u32> for DRAM {
+    fn inspect(&self) -> Result<HashMap<u32, u32>, String> {
+        Ok(self.data.clone())
+    }
+    
     fn inspect_txt(&self) -> Result<String, String> {
         let mut out = String::new();
 
@@ -157,7 +213,21 @@ impl DMCache {
     }
 }
 
-impl InspectableMemory<u32> for DMCache {
+impl InspectableMemory<u32, u32> for DMCache {
+    fn inspect(&self) -> Result<HashMap<u32, u32>, String> {
+        let mut map: HashMap<u32, u32> = HashMap::new();
+
+        for i in 0..DM_CACHE_LINES {
+            let line = self.lines[i];
+            
+            let addr: u32 = ((i as u32) << 22) | line.tag;
+
+            map.insert(addr, line.data);
+        }
+
+        Ok(map)
+    }
+    
     fn inspect_txt(&self) -> Result<String, String> {
         let mut out = String::new();
 
@@ -279,5 +349,25 @@ impl Memory<u32, u32> for DMCache {
 
             SimResult::Wait(total_wait, ())
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Tests the DRAM.load_from_file method.
+    #[test]
+    fn test_dram_load_from_file() {
+        let mut dram = DRAM::new(0);
+
+        assert_eq!(dram.load_from_file("./test-data/dram-test.bin"), Ok(()));
+
+        let mut expected: HashMap<u32, u32> = HashMap::new();
+        for i in 0..16 {
+            expected.insert(i as u32, 15 - (i as u32));
+        }
+
+        assert_eq!(dram.inspect(), Ok(expected));
     }
 }
