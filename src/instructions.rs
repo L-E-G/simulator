@@ -78,6 +78,7 @@ impl Instruction for Load {
     }
 }
 
+/*
 struct Store {
     src_reg: usize,
     addr: u32,
@@ -279,14 +280,23 @@ impl Instruction for AddUIImm {
         return SimResult::Wait(0, ());
     }
 }
+*/
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use mockers::Scenario;
     
     /// Ensures that the load instruction functions correctly.
     #[test]
     fn test_load_instruction() {
+        let scenario = Scenario::new();
+        let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let memory_ref = Rc::new(RefCell::new(memory));
+        let mut regs = Registers::new();
+        
+        let mut load_instruction = Load::new();
+        
         // Pack instruction bits
         // dest = 10100 = R20
         // addr = 00110 = R6
@@ -295,28 +305,39 @@ mod tests {
         const instruction: u32 = ((ADDR_REG_IDX as u32) << 14) | ((DEST_REG_IDX as u32) << 9);
 
         // Setup registers
-        let mut regs = Registers::new();
-
         const DEST_VAL: usize = 444;
         const ADDR_VAL: u32 = 777;
         regs[DEST_REG_IDX] = DEST_VAL as u32;
         regs[ADDR_REG_IDX] = ADDR_VAL;
 
-        // Decode and fetch
-        let mut load_instruction = Load::new();
+        // Setup memory
+        const MEM_DELAY: u16 = 101;
+        const MEM_VALUE: u32 = 567;
         
+        // Decode and fetch
         assert_eq!(load_instruction.decode_and_fetch(instruction, &mut regs),
-                   SimResult::Wait(0, ()), "decode_and_fetch result");
+                   SimResult::Wait(0, ()), "decode_and_fetch() == expected");
         assert_eq!(load_instruction.dest_reg, DEST_REG_IDX,
-                   "instruction.dest_reg == expected");
+                   ".dest_reg == expected");
         assert_eq!(load_instruction.mem_addr, ADDR_VAL,
-                   "instruction.mem_addr == expected");
+                   ".mem_addr == expected");
 
         // Execute
         assert_eq!(load_instruction.execute(), SimResult::Wait(0, ()),
-                   "execute result");
+                   "execute() == expected");
 
-        // TODO: Use mock library to test if correct memory calls are made
-        // TODO: Test rest of Load instruction
+        // Access memory
+        scenario.expect(memory_handle.get(ADDR_VAL)
+                        .and_return(SimResult::Wait(MEM_DELAY, MEM_VALUE)));
+        assert_eq!(load_instruction.access_memory(memory_ref.clone()),
+                   SimResult::Wait(MEM_DELAY, ()), "access_memory() == expected");
+        assert_eq!(load_instruction.value, MEM_VALUE,
+                   ".value == expected");
+
+        // Write back
+        assert_eq!(load_instruction.write_back(&mut regs),
+                   SimResult::Wait(0, ()), "write_back() == expected");
+        assert_eq!(regs[DEST_REG_IDX], MEM_VALUE,
+                   "regs[DEST_REG_IDX] == expected");
     }
 }

@@ -1,3 +1,5 @@
+#[cfg(test)] use mockers_derive::mocked;
+
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -64,6 +66,7 @@ impl IndexMut<usize> for Registers {
 
 /// Memory provides an interface to access a memory struct, A is the address type,
 /// D is the data type.
+#[cfg_attr(test, mocked)]
 pub trait Memory<A, D> {
     /// Retrieve data at a memory address.
     fn get(&mut self, address: A) -> SimResult<D, String>;
