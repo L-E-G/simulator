@@ -267,7 +267,11 @@ impl Instruction for AddUIImm {
     /// Execute the binary operation using usize's function checked_add().
     /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
-        self.result = self.op1.checked_add(self.op2).unwrap() as u32;
+        match self.op1.checked_add(self.op2) {
+            None => return SimResult::Err("Error".to_string()),
+            Some(f) => self.result = f as u32,
+        }
+        // self.result = self.op1.checked_add(self.op2).unwrap() as u32;
         return SimResult::Wait(0, ());
     }
 
