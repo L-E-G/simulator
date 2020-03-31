@@ -13,7 +13,7 @@ mod memory;
 mod instructions;
 pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
-pub use crate::instructions::{Instruction,load};
+pub use crate::instructions::{Instruction,Load};
 
 fn help() {
     println!("Commands:
@@ -33,7 +33,7 @@ fn main() {
 
     let memory = &l1_cache;
 
-    let load = load::new();
+    let load = Load::new();
     let instructions = &load;
     
     help();
