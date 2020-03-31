@@ -97,12 +97,17 @@ impl Instruction for Load {
         /// so that we can perform binary operations on it.
         let mut instString: String = instruction.to_string();
         let mut inststr: &str = &instString[..];
-        let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+        let mut instbin: usize = 0;
+        match usize::from_str_radix(inststr, 2) {
+            Result::Err(e) => return SimResult::Err(e.to_string()),
+            Result::Ok(f) => instbin = f,
+        }
+        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
 
-        /// extract address to load from.
+        /// Extract address to load from.
         self.addr = ((instbin << 14) >> 31) as u32;
 
-        /// extract destination register to load into.
+        /// Extract destination register to load into.
         self.dest = (instbin << 9) >> 31;
         return SimResult::Wait(0, ());
     }
@@ -119,7 +124,7 @@ impl Instruction for Load {
         match memory.borrow_mut().get(self.addr) {
             SimResult::Err(e) => return SimResult::Err(e),
             SimResult::Wait(c, v) => {
-                self.value = v;                          ///Set value to be the value we got from DRAM
+                self.value = v;                          /// Set value to be the value we got from DRAM
                 wait += c;
             }
         };
@@ -139,7 +144,12 @@ impl Instruction for Store {
         /// so that we can perform binary operations on it.
         let mut instString: String = instruction.to_string();
         let mut inststr: &str = &instString[..];
-        let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+        let mut instbin: usize = 0;
+        match usize::from_str_radix(inststr, 2) {
+            Result::Err(e) => return SimResult::Err(e.to_string()),
+            Result::Ok(f) => instbin = f,
+        }
+        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
 
         /// Extract DRAM address from instruction.
         self.addr = ((instbin << 14) >> 31) as u32;
@@ -183,10 +193,15 @@ impl Instruction for Move {
         /// so that we can perform binary operations on it.
         let mut instString: String = instruction.to_string();
         let mut inststr: &str = &instString[..];
-        let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+        let mut instbin: usize = 0;
+        match usize::from_str_radix(inststr, 2) {
+            Result::Err(e) => return SimResult::Err(e.to_string()),
+            Result::Ok(f) => instbin = f,
+        }
+        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
 
         /// Extract destination register from the instruction.
-        self.dest = ((instbin << 13) >> 31);
+        self.dest = (instbin << 13) >> 31;
 
         /// Extract source register that holds the value to move.
         self.src_reg = (instbin << 18) >> 31;
@@ -219,10 +234,15 @@ impl Instruction for AddUIImm {
         /// so that we can perform binary operations on it.
         let mut instString: String = instruction.to_string();
         let mut inststr: &str = &instString[..];
-        let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+        let mut instbin: usize = 0;
+        match usize::from_str_radix(inststr, 2) {
+            Result::Err(e) => return SimResult::Err(e.to_string()),
+            Result::Ok(f) => instbin = f,
+        }
+        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
 
         /// Extract the value of the destination register from instruction.
-        self.dest = ((instbin << 13) >> 31);
+        self.dest = (instbin << 13) >> 31;
 
         /// Extract the value of the immediate value.
         self.op2 = (instbin << 23) >> 31;
@@ -234,7 +254,12 @@ impl Instruction for AddUIImm {
         /// can convert it to a usize so we can perform binary operations to it.
         let mut op1String = registers[self.src_reg].to_string();
         let mut op1str: &str = &op1String[..];
-        self.op1 = usize::from_str_radix(op1str, 2).unwrap();
+
+        match usize::from_str_radix(op1str, 2) {
+            Result::Err(e) => return SimResult::Err(e.to_string()),
+            Result::Ok(f) => self.op1 = f,
+        }
+        // self.op1 = usize::from_str_radix(op1str, 2).unwrap();
         
         return SimResult::Wait(0, ());
     }
