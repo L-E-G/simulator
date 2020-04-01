@@ -38,8 +38,10 @@ impl Sandbox for Display {
         Display {
             prog_ct: 0,
             button: button::State::new(),
-            // load 1 10, store 1 14, move 3 1, add 4 3 0x5  ...   0000001000000101010000000000000, 
-            // 0000001010000101110000000000000, 00000000110010001100001000000000, 00000000001000010000011000000101
+            // load 1 10: 0000001000000101010000000000000, decimal: 16949248
+            // store 1 14: 0000001010000101110000000000000, decimal: 21159936
+            // move 3 1: 00000000110010001100001000000000, decimal: 13156864
+            // add 4 3 0x5: 00000000001000010000011000000101, decimal: 2164229
             word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
             instructions: [16949248, 21159936, 13156864, 2164229, 0],
             index: 0,
@@ -97,104 +99,104 @@ fn main() {
 
     Display::run(Settings::default());
 
-    help();
+    // help();
 
-    loop {
-        print!("> ");
-        io::stdout().flush().expect("failed to flush stdout");
+    // loop {
+    //     print!("> ");
+    //     io::stdout().flush().expect("failed to flush stdout");
         
-        let cmd: String;
-        let operands: String;
-        scan!("{}({})\n", cmd, operands);
+    //     let cmd: String;
+    //     let operands: String;
+    //     scan!("{}({})\n", cmd, operands);
 
-        match cmd.as_str() {
-            "get" => {
-                // Parse operands
-                let address: u32;
-                scan!(operands.bytes() => "{}", address);
+    //     match cmd.as_str() {
+    //         "get" => {
+    //             // Parse operands
+    //             let address: u32;
+    //             scan!(operands.bytes() => "{}", address);
 
-                // Perform operation
-                match memory.borrow_mut().get(address) {
-                    SimResult::Err(e) => eprintln!("Failed to get {}: {}",
-                                                   address, e),
-                    SimResult::Wait(c, v) => {
-                        println!("Completed in {} cycles", c);
-                        println!("{}: {:?}", address, v);
-                    }
-                };
-            },
-            "set" => {
-                // Parse operands
-                let address: u32;
-                let data: u32;
-                scan!(operands.bytes() => "{}, {}", address, data);
+    //             // Perform operation
+    //             match memory.borrow_mut().get(address) {
+    //                 SimResult::Err(e) => eprintln!("Failed to get {}: {}",
+    //                                                address, e),
+    //                 SimResult::Wait(c, v) => {
+    //                     println!("Completed in {} cycles", c);
+    //                     println!("{}: {:?}", address, v);
+    //                 }
+    //             };
+    //         },
+    //         "set" => {
+    //             // Parse operands
+    //             let address: u32;
+    //             let data: u32;
+    //             scan!(operands.bytes() => "{}, {}", address, data);
 
-                // Perform operation
-                match memory.borrow_mut().set(address, data) {
-                    SimResult::Err(e) => eprintln!("Failed to set {}: {}",
-                                                   address, e),
-                    SimResult::Wait(c, _v) => {
-                        println!("Completed in {} cycles", c);
-                    }
-                };
-            },
-            "show" => {
-                // Parse operands
-                let level: String;
-                let address_str: String;
-                scan!(operands.bytes() => "{}, {}", level, address_str);
+    //             // Perform operation
+    //             match memory.borrow_mut().set(address, data) {
+    //                 SimResult::Err(e) => eprintln!("Failed to set {}: {}",
+    //                                                address, e),
+    //                 SimResult::Wait(c, _v) => {
+    //                     println!("Completed in {} cycles", c);
+    //                 }
+    //             };
+    //         },
+    //         "show" => {
+    //             // Parse operands
+    //             let level: String;
+    //             let address_str: String;
+    //             scan!(operands.bytes() => "{}, {}", level, address_str);
 
-                let inspect_res = match address_str.as_str() {
-                    "_" => {
-                        match level.as_str() {
-                            "L1" => l1_cache.borrow().inspect_txt(),
-                            "L2" => l2_cache.borrow().inspect_txt(),
-                            "L3" => l3_cache.borrow().inspect_txt(),
-                            "DRAM" => dram.borrow().inspect_txt(),
-                            _ => Err(format!("Cache level name \"{}\" not \
-                                recognized", level)),
-                        }
-                    },
-                    _ => {
-                        match address_str.parse() {
-                            Err(e) => Err(format!("Failed to parse address argument {} as u32: {}", address_str, e)),
-                            Ok(address) => {
-                                match level.as_str() {
-                                    "L1" => l1_cache.borrow()
-                                        .inspect_address_txt(address),
-                                    "L2" => l2_cache.borrow()
-                                        .inspect_address_txt(address),
-                                    "L3" => l3_cache.borrow()
-                                        .inspect_address_txt(address),
-                                    "DRAM" => dram.borrow()
-                                        .inspect_address_txt(address),
-                                    _ => Err(format!("Cache level name \"{}\" not \
-                                                      recognized", level)),
-                                }
-                            }
-                        }
-                    },
-                };
+    //             let inspect_res = match address_str.as_str() {
+    //                 "_" => {
+    //                     match level.as_str() {
+    //                         "L1" => l1_cache.borrow().inspect_txt(),
+    //                         "L2" => l2_cache.borrow().inspect_txt(),
+    //                         "L3" => l3_cache.borrow().inspect_txt(),
+    //                         "DRAM" => dram.borrow().inspect_txt(),
+    //                         _ => Err(format!("Cache level name \"{}\" not \
+    //                             recognized", level)),
+    //                     }
+    //                 },
+    //                 _ => {
+    //                     match address_str.parse() {
+    //                         Err(e) => Err(format!("Failed to parse address argument {} as u32: {}", address_str, e)),
+    //                         Ok(address) => {
+    //                             match level.as_str() {
+    //                                 "L1" => l1_cache.borrow()
+    //                                     .inspect_address_txt(address),
+    //                                 "L2" => l2_cache.borrow()
+    //                                     .inspect_address_txt(address),
+    //                                 "L3" => l3_cache.borrow()
+    //                                     .inspect_address_txt(address),
+    //                                 "DRAM" => dram.borrow()
+    //                                     .inspect_address_txt(address),
+    //                                 _ => Err(format!("Cache level name \"{}\" not \
+    //                                                   recognized", level)),
+    //                             }
+    //                         }
+    //                     }
+    //                 },
+    //             };
 
-                match inspect_res {
-                    Ok(txt) => {
-                        println!("{} at {}", level, address_str);
-                        println!("{}", txt);
-                    },
-                    Err(e) => {
-                        eprintln!("Failed to inspect {} at {}: {}", level,
-                                  address_str, e);
-                    }
-                };
-            },
-            "help" => help(),
-            "exit" => {
-                exit(0);
-            },
-            _ => {
-                eprintln!("Invalid command: {}", cmd);
-                eprintln!("Use help() command to see valid commands");
-            }
-        }
-    }
+    //             match inspect_res {
+    //                 Ok(txt) => {
+    //                     println!("{} at {}", level, address_str);
+    //                     println!("{}", txt);
+    //                 },
+    //                 Err(e) => {
+    //                     eprintln!("Failed to inspect {} at {}: {}", level,
+    //                               address_str, e);
+    //                 }
+    //             };
+    //         },
+    //         "help" => help(),
+    //         "exit" => {
+    //             exit(0);
+    //         },
+    //         _ => {
+    //             eprintln!("Invalid command: {}", cmd);
+    //             eprintln!("Use help() command to see valid commands");
+    //         }
+    //     }
+    // }
 }
