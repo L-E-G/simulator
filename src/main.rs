@@ -22,9 +22,8 @@ struct Display {
     dram: Rc<RefCell<DRAM>>,
     prog_ct: u32,
     button: button::State,
-    word: [String; 8],
-    instructions: [&'static str; 8],
-    assembly: [String; 8],
+    word: [String; 9],
+    instructions: [&'static str; 9],
     index: usize,
 }
 
@@ -45,10 +44,18 @@ impl Sandbox for Display {
             // store 1 14: 0000001010000101110000000000000, decimal: 21159936
             // move 3 1: 00000000110010001100001000000000, decimal: 13156864
             // add 4 3 0x5: 00000000001000010000011000000101, decimal: 2164229
-            word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
-            instructions: ["0000001000000101010000000000000", "", "0000001010000101110000000000000", "",
-                    "00000000110010001100001000000000", "", "00000000001000010000011000000101", ""],
-            assembly: ["ldr 1 10".to_string(), "".to_string(), "str 1 14".to_string(), "".to_string(), "mv 3 1".to_string(), "".to_string(), "addImm 4 3 0x5".to_string(), "".to_string()],
+            word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
+            instructions: [
+                "ldr 1 10 0000001000000101010000000000000\nStage: fetch_and_decode\nDram addr# 10: 43 Reg #1: 0\n", 
+                "ldr 1 10 0000001000000101010000000000000\nStage: execute\nstr 1 14 0000001010000101110000000000000\nStage: fetch_and_decode\nDram addr# 14: 0, Dram addr# 10: 43 Reg #1: 0\n",
+                "ldr 1 10 0000001000000101010000000000000\nStage: memory_access\nstr 1 14 0000001010000101110000000000000\nStage: Blocked\nmv 3 1 00000000110010001100001000000000\nStage: Blocked\nDram addr# 14: 0, Dram addr# 10: 43 Reg #1: 0\n", 
+                "ldr 1 10 0000001000000101010000000000000\nStage: write_back\nstr 1 14 0000001010000101110000000000000\nStage: execute\nmv 3 1 00000000110010001100001000000000\nStage: fetch_and_decode\nDram addr# 14: 0, Dram addr# 10: 43 Reg #1: 43\n", 
+                "str 1 14 0000001010000101110000000000000\nStage: memory_access\nmv 3 1 00000000110010001100001000000000\nStage: execute\naddImm 4 3 0x5 00000000001000010000011000000101\nStage: fetch_and_decode\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 0\n",
+                "str 1 14 0000001010000101110000000000000\nStage: write_back\nmv 3 1 00000000110010001100001000000000\nStage: memory_access\naddImm 4 3 0x5 00000000001000010000011000000101\nStage: Blocked\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 0\n",
+                "mv 3 1 00000000110010001100001000000000\nStage: write_back\naddImm 4 3 0x5 00000000001000010000011000000101\nStage: execute\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 43\n",
+                "addImm 4 3 0x5 00000000001000010000011000000101\nStage: memory_access\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 43\n",
+                "addImm 4 3 0x5 00000000001000010000011000000101\nStage: write_back\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 43, #4: 48\n",
+            ],
             index: 0,
         }
     }
@@ -60,23 +67,29 @@ impl Sandbox for Display {
     fn update(&mut self, message: Message) {
         match message {
             Message::Pressed => {
-                self.word[self.index] = format!("{}: {}",self.assembly[self.index], self.instructions[self.index].to_string());
-                // self.word[self.index] = self.instructions[self.index].to_string();
-                // let mut inst: u32 = 0;
-                // match self.instructions[self.index].parse::<u32>() {
-                //     Result::Err(e) => {},       // I know I know, this is not how we fail gracefully...
-                //     Result::Ok(f) => inst = f,
-                // }
-                // pipeline(inst);   Can use this for pipeline call
+                if self.index <= 9{
+                    // self.word[self.index] = format!("{}: {}",self.assembly[self.index], self.instructions[self.index].to_string());
+                    self.word[self.index] = self.instructions[self.index].to_string();
+                    // let mut inst: u32 = 0;
+                    // match self.instructions[self.index].parse::<u32>() {
+                    //     Result::Err(e) => {},       // I know I know, this is not how we fail gracefully...
+                    //     Result::Ok(f) => inst = f,
+                    // }
+                    // pipeline(inst);   Can use this for pipeline call
 
-                self.index+=1;
-                match self.dram.borrow().inspect_txt() {
-                    Err(e) => println!("Failed to get stuff from DRAM per error {}", e),
-                    Ok(d) => self.word[self.index] = d,
+                    // self.index+=1;
+                    // match self.dram.borrow().inspect_txt() {
+                    //     Err(e) => println!("Failed to get stuff from DRAM per error {}", e),
+                    //     Ok(d) => self.word[self.index] = d,
+                    // }
+                    if self.index == 2 || self.index == 4{
+                        self.prog_ct += 100;
+                    }else{
+                        self.prog_ct+=1;
+                    }
+                      //This can eventually reference he program counter from the pipeline file
+                    self.index+=1;
                 }
-                
-                self.prog_ct+=1;  //This can eventually reference he program counter from the pipeline file
-                self.index+=1;
             }
         }
     }
@@ -97,6 +110,7 @@ impl Sandbox for Display {
             .push(Text::new(self.word[5].to_string()))
             .push(Text::new(self.word[6].to_string()))
             .push(Text::new(self.word[7].to_string()))
+            .push(Text::new(self.word[8].to_string()))
             .into()
     }
 }
