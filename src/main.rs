@@ -11,6 +11,7 @@ use std::io::Write;
 mod result;
 mod memory;
 mod instructions;
+mod control_unit;
 pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
 pub use crate::instructions::Instruction;

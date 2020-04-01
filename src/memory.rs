@@ -6,7 +6,6 @@ use std::rc::Rc;
 use std::ops::{Index,IndexMut};
 use std::io::{Read,BufReader};
 use std::fs::File;
-use std::path::Path;
 
 use crate::result::SimResult;
 

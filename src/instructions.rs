@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::clone::Clone;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,Registers};
@@ -22,7 +23,36 @@ pub trait Instruction {
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String>;
 }
 
+/// An instruction which performs no operations.
+#[derive(Clone)]
+pub struct Noop {}
+
+impl Noop {
+    pub fn new() -> Noop {
+        Noop{}
+    }
+}
+
+impl Instruction for Noop {
+    fn decode_and_fetch(&mut self, _instruction: u32, _registers: &Registers) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+
+    fn access_memory(&mut self, _memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+
+    fn write_back(&mut self, _registers: &mut Registers) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+}
+
 /// Read a value from an address in memory and place it in a register.
+#[derive(Clone)]
 pub struct Load {
     /// Register to place value from memory.
     dest_reg: usize,
@@ -80,7 +110,8 @@ impl Instruction for Load {
 }
 
 /// Writes a value in memory from a register.
-struct Store {
+#[derive(Clone)]
+pub struct Store {
     /// Address in memory to save value.
     dest_addr: u32,
 
@@ -123,7 +154,7 @@ impl Instruction for Store {
     }
 
     /// No write back stage.
-    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+    fn write_back(&mut self, _registers: &mut Registers) -> SimResult<(), String> {
         SimResult::Wait(0, ())
     }
 }

@@ -22,4 +22,12 @@ impl<D, E: Display> SimResult<D, E> {
             SimResult::Wait(c, d) => (c, d),
         }
     }
+
+    /// Returns true if wait is 0. If error returns false.
+    pub fn ready(self) -> bool {
+        match self {
+            SimResult::Err(_e) => false,
+            SimResult::Wait(wait, _v) => wait == 0,
+        }
+    }
 }
