@@ -17,13 +17,14 @@ pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
 pub use crate::instructions::Instruction;
 
-#[derive(Default)]
+// #[derive(Default)]
 struct Display {
+    dram: Rc<RefCell<DRAM>>,
     prog_ct: u32,
     button: button::State,
-    word: [String; 5],
-    instructions: [&'static str; 5],
-    assembly: [String; 5],
+    word: [String; 8],
+    instructions: [&'static str; 8],
+    assembly: [String; 8],
     index: usize,
 }
 
@@ -37,16 +38,17 @@ impl Sandbox for Display {
 
     fn new() -> Self {
         Display {
+            dram: Rc::new(RefCell::new(DRAM::new(100))),
             prog_ct: 0,
             button: button::State::new(),
             // load 1 10: 0000001000000101010000000000000, decimal: 16949248
             // store 1 14: 0000001010000101110000000000000, decimal: 21159936
             // move 3 1: 00000000110010001100001000000000, decimal: 13156864
             // add 4 3 0x5: 00000000001000010000011000000101, decimal: 2164229
-            word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
-            instructions: ["0000001000000101010000000000000", "0000001010000101110000000000000",
-                    "00000000110010001100001000000000", "00000000001000010000011000000101", ""],
-            assembly: ["ldr 1 10".to_string(), "str 1 14".to_string(), "mv 3 1".to_string(), "addImm 4 3 0x5".to_string(), "".to_string()],
+            word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
+            instructions: ["0000001000000101010000000000000", "", "0000001010000101110000000000000", "",
+                    "00000000110010001100001000000000", "", "00000000001000010000011000000101", ""],
+            assembly: ["ldr 1 10".to_string(), "".to_string(), "str 1 14".to_string(), "".to_string(), "mv 3 1".to_string(), "".to_string(), "addImm 4 3 0x5".to_string(), "".to_string()],
             index: 0,
         }
     }
@@ -59,13 +61,21 @@ impl Sandbox for Display {
         match message {
             Message::Pressed => {
                 self.word[self.index] = format!("{}: {}",self.assembly[self.index], self.instructions[self.index].to_string());
-                let mut inst: u32 = 0;
-                match self.instructions[self.index].parse::<u32>() {
-                    Result::Err(e) => {},       // I know I know, this is not how we fail gracefully...
-                    Result::Ok(f) => inst = f,
-                }
+                // self.word[self.index] = self.instructions[self.index].to_string();
+                // let mut inst: u32 = 0;
+                // match self.instructions[self.index].parse::<u32>() {
+                //     Result::Err(e) => {},       // I know I know, this is not how we fail gracefully...
+                //     Result::Ok(f) => inst = f,
+                // }
                 // pipeline(inst);   Can use this for pipeline call
-                self.prog_ct+=1;
+
+                self.index+=1;
+                match self.dram.borrow().inspect_txt() {
+                    Err(e) => println!("Failed to get stuff from DRAM per error {}", e),
+                    Ok(d) => self.word[self.index] = d,
+                }
+                
+                self.prog_ct+=1;  //This can eventually reference he program counter from the pipeline file
                 self.index+=1;
             }
         }
@@ -83,6 +93,10 @@ impl Sandbox for Display {
             .push(Text::new(self.word[1].to_string()))
             .push(Text::new(self.word[2].to_string()))
             .push(Text::new(self.word[3].to_string()))
+            .push(Text::new(self.word[4].to_string()))
+            .push(Text::new(self.word[5].to_string()))
+            .push(Text::new(self.word[6].to_string()))
+            .push(Text::new(self.word[7].to_string()))
             .into()
     }
 }
