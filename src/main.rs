@@ -23,6 +23,7 @@ struct Display {
     button: button::State,
     word: [String; 5],
     instructions: [&'static str; 5],
+    assembly: [String; 5],
     index: usize,
 }
 
@@ -45,6 +46,7 @@ impl Sandbox for Display {
             word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
             instructions: ["0000001000000101010000000000000", "0000001010000101110000000000000",
                     "00000000110010001100001000000000", "00000000001000010000011000000101", ""],
+            assembly: ["ldr 1 10".to_string(), "str 1 14".to_string(), "mv 3 1".to_string(), "addImm 4 3 0x5".to_string(), "".to_string()],
             index: 0,
         }
     }
@@ -56,7 +58,7 @@ impl Sandbox for Display {
     fn update(&mut self, message: Message) {
         match message {
             Message::Pressed => {
-                self.word[self.index] = self.instructions[self.index].to_string();
+                self.word[self.index] = format!("{}: {}",self.assembly[self.index], self.instructions[self.index].to_string());
                 let mut inst: u32 = 0;
                 match self.instructions[self.index].parse::<u32>() {
                     Result::Err(e) => {},       // I know I know, this is not how we fail gracefully...
