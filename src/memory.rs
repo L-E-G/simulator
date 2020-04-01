@@ -1,11 +1,17 @@
+#[cfg(test)] use mockers_derive::mocked;
+
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::ops::{Index,IndexMut};
 use std::io::{Read,BufReader};
 use std::fs::File;
 use std::path::Path;
 
 use crate::result::SimResult;
+
+/// The size of the register file.
+const REGISTERS_SIZE: usize = 32;
 
 /// Holds all computation registers.
 /// Indexes:
@@ -16,7 +22,11 @@ use crate::result::SimResult;
 /// - 29: Status
 /// - 30: Stack pointer
 /// - 31: Subroutine link return address
-pub type Registers = [u32; 32];
+#[derive(Clone,Debug,PartialEq)]
+pub struct Registers {
+    /// Holds register values
+    file: [u32; REGISTERS_SIZE],
+}
 
 /// Interupt link register index
 pub const INTLR: usize = 26;
@@ -36,8 +46,31 @@ pub const SP: usize = 30;
 /// Link register index
 pub const LR: usize = 31;
 
+impl Registers {
+    pub fn new() -> Registers {
+        Registers{
+            file: [0; REGISTERS_SIZE],
+        }
+    }
+}
+
+impl Index<usize> for Registers {
+    type Output = u32;
+    
+    fn index(&self, idx: usize) -> &u32 {
+        &self.file[idx]
+    }
+}
+
+impl IndexMut<usize> for Registers {
+    fn index_mut(&mut self, idx: usize) -> &mut u32 {
+        &mut self.file[idx]
+    }
+}
+
 /// Memory provides an interface to access a memory struct, A is the address type,
 /// D is the data type.
+#[cfg_attr(test, mocked)]
 pub trait Memory<A, D> {
     /// Retrieve data at a memory address.
     fn get(&mut self, address: A) -> SimResult<D, String>;
@@ -355,6 +388,18 @@ impl Memory<u32, u32> for DMCache {
 #[cfg(test)]
 mod tests {
     use super::*;
+    
+    /// Tests that the Registers type index trait implementations work.
+    #[test]
+    fn test_registers_indexable() {
+        let mut regs = Registers::new();
+
+        for i in 0..REGISTERS_SIZE {
+            regs[i] = (REGISTERS_SIZE - i) as u32;
+            assert_eq!(regs[i], (REGISTERS_SIZE - i) as u32,
+                       "Registers[{}] failed to set", i);
+        }
+    }
 
     /// Tests the DRAM.load_from_file method.
     #[test]

@@ -10,8 +10,10 @@ use std::io::Write;
 
 mod result;
 mod memory;
+mod instructions;
 pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
+pub use crate::instructions::Instruction;
 
 fn help() {
     println!("Commands:
@@ -30,7 +32,7 @@ fn main() {
     let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
 
     let memory = &l1_cache;
-    
+
     help();
 
     loop {
