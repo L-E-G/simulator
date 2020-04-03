@@ -1,8 +1,11 @@
 extern crate text_io;
 
+
 use text_io::scan;
 
+
 use iced::{button, Align, Button, Column, Element, Sandbox, Settings, Text, Container, Row};
+
 
 use std::process::exit;
 use std::cell::RefCell;
@@ -10,12 +13,14 @@ use std::rc::Rc;
 use std::io;
 use std::io::Write;
 
+
 mod result;
 mod memory;
 mod instructions;
 pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
 pub use crate::instructions::Instruction;
+
 
 // #[derive(Default)]
 struct Display {
