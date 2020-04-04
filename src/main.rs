@@ -4,7 +4,7 @@ use text_io::scan;
 
 use iced::{button, Align, Button, Column, Element, Sandbox, Settings, 
     Text, Container, Row, Scrollable, scrollable, PaneGrid, pane_grid, 
-    Length, keyboard, HorizontalAlignment,
+    Length, keyboard, HorizontalAlignment, Image,
 };
 
 use std::process::exit;
@@ -35,7 +35,7 @@ struct Display {
 #[derive(Debug, Clone, Copy)]
 enum Message {
     Pressed,
-    Split(pane_grid::Axis, pane_grid::Pane),
+    Split(pane_grid::Axis, pane_grid::Pane, u32),
 }
 
 impl Sandbox for Display {
@@ -77,43 +77,48 @@ impl Sandbox for Display {
     fn update(&mut self, message: Message) {
         match message {
             Message::Pressed => {
-                if self.index <= 9{
-                    // self.word[self.index] = format!("{}: {}",self.assembly[self.index], self.instructions[self.index].to_string());
-                    self.word[self.index] = self.instructions[self.index].to_string();
-                    // let mut inst: u32 = 0;
-                    // match self.instructions[self.index].parse::<u32>() {
-                    //     Result::Err(e) => {},       // I know I know, this is not how we fail gracefully...
-                    //     Result::Ok(f) => inst = f,
-                    // }
-                    // pipeline(inst);   Can use this for pipeline call
-
-                    // self.index+=1;
-                    // match self.dram.borrow().inspect_txt() {
-                    //     Err(e) => println!("Failed to get stuff from DRAM per error {}", e),
-                    //     Ok(d) => self.word[self.index] = d,
-                    // }
-                    if self.index == 2 || self.index == 4{
-                        self.prog_ct += 100;
-                    }else{
-                        self.prog_ct+=1;
-                    }
-                      //This can eventually reference he program counter from the pipeline file
-                    self.index+=1;
-                }
+                self.word[self.index] = self.instructions[self.index].to_string();
+                // pipeline(var);   Can use this for pipeline call
+                
+                self.prog_ct+=1;
+                self.index+=1;
             }
-            Message::Split(axis, pane) => {
+
+            Message::Split(axis, pane, data) => {
                 let _ = self.panes.split(
                     axis,
                     &pane,
-                    Content::new(12),
+                    Content::new(data),
                 );
             }
         }
-
-        
     }
 
     fn view(&mut self) -> Element<Message> {
+
+        let row = Row::new()
+            .push(Text::new("Program counter: 32"))
+            .spacing(745)
+            .push(
+                Button::new(&mut self.button, Text::new("Increment")),
+            )
+            .width(Length::Fill)
+            .max_height(40);
+        
+        let img = Image::new("/src/line.png");
+
+        let column = Column::new()
+            .push(Text::new("Rob is cool"));
+        
+        let scroll_column = Scrollable::new(&mut self.scroll)
+            .push(column);
+        
+        let window = Column::new()
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .push(row)
+            .spacing(30)
+            .push(scroll_column);
 
         let pane_grid =
             PaneGrid::new(&mut self.panes, |pane, content, focus| {
@@ -123,7 +128,7 @@ impl Sandbox for Display {
             .height(Length::Fill)
             .spacing(10);
 
-        Container::new(pane_grid)
+        Container::new(window) // Change this to pane_grid for a look at what I made with the panes
             .width(Length::Fill)
             .height(Length::Fill)
             .padding(10)
@@ -133,24 +138,36 @@ impl Sandbox for Display {
 
 struct Content{
     prog_ct: u32,
+    button: button::State,
 }
 
 impl Content{
     fn new(pc: u32) -> Self{
         Content{
             prog_ct: pc,
+            button: button::State::new(),
         }
     }
     fn view(&mut self, pane: pane_grid::Pane, focus: Option<pane_grid::Focus>) -> Element<Message>{
 
-        Message::Split(pane_grid::Axis::Vertical, pane);
+        let button = Button::new(
+                    &mut self.button,
+                    Text::new("Split")
+                        .width(Length::Fill)
+                        .horizontal_alignment(HorizontalAlignment::Center)
+                        .size(16),
+                )
+                .width(Length::Fill)
+                .padding(8)
+                .on_press(Message::Split(pane_grid::Axis::Horizontal, pane, 12))
+                .style(style::Button::Primary);
 
         let column = Column::new()
-            .push(Text::new(self.prog_ct.to_string()).size(20))
             .width(Length::Fill)
-            .height(Length::Fill)
+            .spacing(10)
             .align_items(Align::Center)
-            .padding(5);
+            .push(Text::new(self.prog_ct.to_string()))
+            .push(button);
         
         Container::new(column)
             .width(Length::Fill)
