@@ -1523,6 +1523,7 @@ version = "0.1.0"
 dependencies = [
  "iced 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "iced_core 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "iced_futures 0.1.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "iced_native 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "iced_web 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
  "iced_wgpu 0.2.0 (registry+https://github.com/rust-lang/crates.io-index)",

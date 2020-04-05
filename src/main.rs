@@ -2,10 +2,13 @@ extern crate text_io;
 
 use text_io::scan;
 
-use iced::{button, Align, Button, Column, Element, Sandbox, Settings, 
-    Text, Container, Row, Scrollable, scrollable, PaneGrid, pane_grid, 
-    Length, keyboard, HorizontalAlignment, Image,
+use iced::{
+    executor, Application, Column, Command, Container,
+    Element, Length, Settings, Subscription, Text, Row, button, Button,
+    scrollable, Scrollable,
 };
+
+use std::time::{Duration, Instant};
 
 use std::process::exit;
 use std::cell::RefCell;
@@ -20,248 +23,147 @@ pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
 pub use crate::instructions::Instruction;
 
-// #[derive(Default)]
+#[derive(Debug, Default)]
 struct Display {
-    dram: Rc<RefCell<DRAM>>,
-    prog_ct: u32,
+    last: Vec<String>,
+    enabled: bool,
     button: button::State,
-    word: [String; 9],
-    instructions: [&'static str; 9],
-    index: usize,
     scroll: scrollable::State,
-    panes: pane_grid::State<Content>,
+    prog_ct: u32
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 enum Message {
-    Pressed,
-    Split(pane_grid::Axis, pane_grid::Pane, u32),
+    Get(Instant),
+    Toggled(bool),
+    AddEvent(String)
 }
 
-impl Sandbox for Display {
+impl Application for Display {
+    type Executor = executor::Default;
     type Message = Message;
+    type Flags = ();
 
-    fn new() -> Self {
-        let (panes, _) = pane_grid::State::new(Content::new(32));
-
-        Display {
-            dram: Rc::new(RefCell::new(DRAM::new(100))),
-            prog_ct: 0,
-            button: button::State::new(),
-            // load 1 10: 0000001000000101010000000000000, decimal: 16949248
-            // store 1 14: 0000001010000101110000000000000, decimal: 21159936
-            // move 3 1: 00000000110010001100001000000000, decimal: 13156864
-            // add 4 3 0x5: 00000000001000010000011000000101, decimal: 2164229
-            word: ["".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string(), "".to_string()],
-            instructions: [
-                "ldr 1 10 0000001000000101010000000000000\nStage: fetch_and_decode\nDram addr# 10: 43 Reg #1: 0\n", 
-                "ldr 1 10 0000001000000101010000000000000\nStage: execute\nstr 1 14 0000001010000101110000000000000\nStage: fetch_and_decode\nDram addr# 14: 0, Dram addr# 10: 43 Reg #1: 0\n",
-                "ldr 1 10 0000001000000101010000000000000\nStage: memory_access\nstr 1 14 0000001010000101110000000000000\nStage: Blocked\nmv 3 1 00000000110010001100001000000000\nStage: Blocked\nDram addr# 14: 0, Dram addr# 10: 43 Reg #1: 0\n", 
-                "ldr 1 10 0000001000000101010000000000000\nStage: write_back\nstr 1 14 0000001010000101110000000000000\nStage: execute\nmv 3 1 00000000110010001100001000000000\nStage: fetch_and_decode\nDram addr# 14: 0, Dram addr# 10: 43 Reg #1: 43\n", 
-                "str 1 14 0000001010000101110000000000000\nStage: memory_access\nmv 3 1 00000000110010001100001000000000\nStage: execute\naddImm 4 3 0x5 00000000001000010000011000000101\nStage: fetch_and_decode\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 0\n",
-                "str 1 14 0000001010000101110000000000000\nStage: write_back\nmv 3 1 00000000110010001100001000000000\nStage: memory_access\naddImm 4 3 0x5 00000000001000010000011000000101\nStage: Blocked\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 0\n",
-                "mv 3 1 00000000110010001100001000000000\nStage: write_back\naddImm 4 3 0x5 00000000001000010000011000000101\nStage: execute\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 43\n",
-                "addImm 4 3 0x5 00000000001000010000011000000101\nStage: memory_access\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 43\n",
-                "addImm 4 3 0x5 00000000001000010000011000000101\nStage: write_back\nDram addr# 14: 43, Dram addr# 10: 43 Reg #1: 43, #3: 43, #4: 48\n",
-            ],
-            index: 0,
-            scroll: scrollable::State::new(),
-            panes,
-        }
+    fn new(_flags: ()) -> (Display, Command<Message>) {
+        (
+            Display {
+                last: Vec::new(),
+                enabled: true,
+                button: button::State::new(),
+                scroll: scrollable::State::new(),
+                prog_ct: 0,
+            },
+            Command::none()
+        )
     }
 
     fn title(&self) -> String {
-        String::from("Simulator")
+        String::from("Events - Iced")
     }
 
-    fn update(&mut self, message: Message) {
+    fn update(&mut self, message: Message) -> Command<Message> {
         match message {
-            Message::Pressed => {
-                self.word[self.index] = self.instructions[self.index].to_string();
-                // pipeline(var);   Can use this for pipeline call
-                
+            Message::Get(event) => {
+                for i in 0..10 {
+                    Message::AddEvent(i.to_string());
+                }
+            }
+            Message::Toggled(enabled) => {
+                self.enabled = enabled;
+            }
+            Message::AddEvent(event) => {
+                self.last.push(event);
                 self.prog_ct+=1;
-                self.index+=1;
             }
+        };
 
-            Message::Split(axis, pane, data) => {
-                let _ = self.panes.split(
-                    axis,
-                    &pane,
-                    Content::new(data),
-                );
-            }
-        }
+        Command::none()
+    }
+
+    fn subscription(&self) -> Subscription<Message> {
+        // time::every(Duration::from_millis(10)).map(Message::Get)
+        Subscription::none()
     }
 
     fn view(&mut self) -> Element<Message> {
 
         let row = Row::new()
-            .push(Text::new("Program counter: 32"))
+            .push(Text::new(format!("Program Counter: {}", self.prog_ct)))
             .spacing(745)
             .push(
-                Button::new(&mut self.button, Text::new("Increment")),
+                Button::new(&mut self.button, Text::new("Step"))
+                    .on_press(Message::AddEvent("Rob was here".to_string())),
             )
             .width(Length::Fill)
             .max_height(40);
-        
-        let img = Image::new("/src/line.png");
 
-        let column = Column::new()
-            .push(Text::new("Rob is cool"));
-        
+        let events = self.last.iter().fold(
+            Column::new().spacing(10),
+            |column, event| {
+                column.push(Text::new(format!("{}", event)).size(20))
+            },
+        );
+
+        // let toggle = Checkbox::new(
+        //     self.enabled,
+        //     "Listen to runtime events",
+        //     Message::Toggled,
+        // );
         let scroll_column = Scrollable::new(&mut self.scroll)
-            .push(column);
-        
-        let window = Column::new()
+            .push(events)
             .width(Length::Fill)
-            .height(Length::Fill)
-            .push(row)
-            .spacing(30)
-            .push(scroll_column);
+            .height(Length::Fill);
 
-        let pane_grid =
-            PaneGrid::new(&mut self.panes, |pane, content, focus| {
-                content.view(pane, focus)
-            })
-            .width(Length::Fill)
-            .height(Length::Fill)
+        let content = Column::new()
+            .spacing(10)
+            .push(row)
+            .spacing(20)
+            .push(scroll_column)
             .spacing(10);
 
-        Container::new(window) // Change this to pane_grid for a look at what I made with the panes
+        Container::new(content)
+            .padding(20)
             .width(Length::Fill)
             .height(Length::Fill)
-            .padding(10)
+            .center_x()
             .into()
     }
 }
 
-struct Content{
-    prog_ct: u32,
-    button: button::State,
-}
+// mod time {
+//     use iced::futures;
 
-impl Content{
-    fn new(pc: u32) -> Self{
-        Content{
-            prog_ct: pc,
-            button: button::State::new(),
-        }
-    }
-    fn view(&mut self, pane: pane_grid::Pane, focus: Option<pane_grid::Focus>) -> Element<Message>{
+//     pub fn every(duration: std::time::Duration) -> iced::Subscription<std::time::Instant> {
+//         iced::Subscription::from_recipe(Every(duration))
+//     }
 
-        let button = Button::new(
-                    &mut self.button,
-                    Text::new("Split")
-                        .width(Length::Fill)
-                        .horizontal_alignment(HorizontalAlignment::Center)
-                        .size(16),
-                )
-                .width(Length::Fill)
-                .padding(8)
-                .on_press(Message::Split(pane_grid::Axis::Horizontal, pane, 12))
-                .style(style::Button::Primary);
+//     struct Every(std::time::Duration);
 
-        let column = Column::new()
-            .width(Length::Fill)
-            .spacing(10)
-            .align_items(Align::Center)
-            .push(Text::new(self.prog_ct.to_string()))
-            .push(button);
-        
-        Container::new(column)
-            .width(Length::Fill)
-            .height(Length::Fill)
-            .padding(5)
-            .center_y()
-            .style(style::Pane {
-                is_focused: focus.is_some(),
-            })
-            .into()
-    }
-}
+//     impl<H, I> iced_native::subscription::Recipe<H, I> for Every
+//     where
+//         H: std::hash::Hasher,
+//     {
+//         type Output = std::time::Instant;
 
-mod style {
-    use iced::{button, container, Background, Color, Vector};
+//         fn hash(&self, state: &mut H) {
+//             use std::hash::Hash;
 
-    const SURFACE: Color = Color::from_rgb(
-        0xF2 as f32 / 255.0,
-        0xF3 as f32 / 255.0,
-        0xF5 as f32 / 255.0,
-    );
+//             std::any::TypeId::of::<Self>().hash(state);
+//             self.0.hash(state);
+//         }
 
-    const ACTIVE: Color = Color::from_rgb(
-        0x72 as f32 / 255.0,
-        0x89 as f32 / 255.0,
-        0xDA as f32 / 255.0,
-    );
+//         fn stream(
+//             self: Box<Self>,
+//             _input: futures::stream::BoxStream<'static, I>,
+//         ) -> futures::stream::BoxStream<'static, Self::Output> {
+//             // use futures::stream::StreamExt;
 
-    const HOVERED: Color = Color::from_rgb(
-        0x67 as f32 / 255.0,
-        0x7B as f32 / 255.0,
-        0xC4 as f32 / 255.0,
-    );
-
-    pub struct Pane {
-        pub is_focused: bool,
-    }
-
-    impl container::StyleSheet for Pane {
-        fn style(&self) -> container::Style {
-            container::Style {
-                background: Some(Background::Color(SURFACE)),
-                border_width: 2,
-                border_color: Color {
-                    a: if self.is_focused { 1.0 } else { 0.3 },
-                    ..Color::BLACK
-                },
-                ..Default::default()
-            }
-        }
-    }
-
-    pub enum Button {
-        Primary,
-        Destructive,
-    }
-
-    impl button::StyleSheet for Button {
-        fn active(&self) -> button::Style {
-            let (background, text_color) = match self {
-                Button::Primary => (Some(ACTIVE), Color::WHITE),
-                Button::Destructive => {
-                    (None, Color::from_rgb8(0xFF, 0x47, 0x47))
-                }
-            };
-
-            button::Style {
-                text_color,
-                background: background.map(Background::Color),
-                border_radius: 5,
-                shadow_offset: Vector::new(0.0, 0.0),
-                ..button::Style::default()
-            }
-        }
-
-        fn hovered(&self) -> button::Style {
-            let active = self.active();
-
-            let background = match self {
-                Button::Primary => Some(HOVERED),
-                Button::Destructive => Some(Color {
-                    a: 0.2,
-                    ..active.text_color
-                }),
-            };
-
-            button::Style {
-                background: background.map(Background::Color),
-                ..active
-            }
-        }
-    }
-}
-
+//             async_std::stream::interval(self.0)
+//                 .map(|_| std::time::Instant::now())
+//                 .boxed()
+//         }
+//     }
+// }
 
 fn help() {
     println!("Commands:
@@ -274,12 +176,12 @@ fn help() {
 }
 
 fn main() {
-    let dram = Rc::new(RefCell::new(DRAM::new(100)));
-    let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
-    let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
-    let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
+    // let dram = Rc::new(RefCell::new(DRAM::new(100)));
+    // let l3_cache = Rc::new(RefCell::new(DMCache::new(40, dram.clone())));
+    // let l2_cache = Rc::new(RefCell::new(DMCache::new(10, l3_cache.clone())));
+    // let l1_cache = Rc::new(RefCell::new(DMCache::new(1, l2_cache.clone())));
 
-    let memory = &l1_cache;
+    // let memory = &l1_cache;
 
     Display::run(Settings::default());
 
