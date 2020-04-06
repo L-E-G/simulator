@@ -6,6 +6,7 @@ use std::rc::Rc;
 use std::ops::{Index,IndexMut};
 use std::io::{Read,BufReader};
 use std::fs::File;
+use std::fmt;
 
 use crate::result::SimResult;
 
@@ -53,6 +54,37 @@ impl Registers {
     }
 }
 
+impl fmt::Display for Registers {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut out = String::new();
+        
+        for i in 0..REGISTERS_SIZE {
+            let key = match i {
+                INTLR => "INTLR",
+                IHDLR => "IHDLR",
+                PC => "PC",
+                STS => "STS",
+                SP => "SP",
+                LR => "LR",
+                _ => "",
+            };
+            if key.len() == 0 {
+                out.push_str(format!("{}", i).as_str());
+            } else {
+                out.push_str(format!("{}", key).as_str());
+            }
+            
+            out.push_str(format!(": {}", self.file[i]).as_str());
+
+            if i + 1 != REGISTERS_SIZE {
+                out.push_str("\n");
+            }
+        }
+
+        write!(f, "{}", out)
+    }
+}
+
 impl Index<usize> for Registers {
     type Output = u32;
     
@@ -84,9 +116,6 @@ pub trait InspectableMemory<A, D> {
     /// Returns a map of all a memory's contents. Where keys are addresses and
     /// values are memory values.
     fn inspect(&self) -> Result<HashMap<A, D>, String>;
-    
-    /// Returns a text description of the entire data structure.
-    fn inspect_txt(&self) -> Result<String, String>;
     
     /// Returns a text description of an address.
     fn inspect_address_txt(&self, address: A) -> Result<String, String>;
@@ -157,16 +186,6 @@ impl InspectableMemory<u32, u32> for DRAM {
         Ok(self.data.clone())
     }
     
-    fn inspect_txt(&self) -> Result<String, String> {
-        let mut out = String::new();
-
-        for (k, v) in &self.data {
-            out.push_str(format!("{}: {}\n", k, v).as_str());
-        }
-
-        Ok(out)
-    }
-    
     fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
         match self.data.get(&address) {
             Some(d) => Ok(format!("\
@@ -174,6 +193,25 @@ Address: {}
 Value  : {}", address, *d)),
             None => Ok(format!("Does not exist")),
         }
+    }
+}
+
+impl fmt::Display for DRAM {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut out = String::new();
+
+        let mut i = 0;
+        for (k, v) in &self.data {
+            out.push_str(format!("{}: {}", k, v).as_str());
+
+            if i + 1 != self.data.len() {
+                out.push_str("\n");
+            }
+            
+            i += 1;
+        }
+
+        write!(f, "{}", out)
     }
 }
 
@@ -259,21 +297,6 @@ impl InspectableMemory<u32, u32> for DMCache {
 
         Ok(map)
     }
-    
-    fn inspect_txt(&self) -> Result<String, String> {
-        let mut out = String::new();
-
-        for line in self.lines.iter() {
-            if !line.valid {
-                continue;
-            }
-            
-            out.push_str(format!("{} = {} [valid={}, dirty={}]\n",
-                line.tag, line.data, line.valid, line.dirty).as_str());
-        }
-
-        Ok(out)
-    }
         
     fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
         let idx = self.get_address_index(address);
@@ -287,6 +310,28 @@ Data : {}
 Valid: {}
 Dirty: {}", idx,
                    line.tag, line.data, line.valid, line.dirty))
+    }
+}
+
+impl fmt::Display for DMCache {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let mut out = String::new();
+
+        let mut i = 0;
+        for line in self.lines.iter() {
+            if line.valid {
+                out.push_str(format!("{} = {} [valid={}, dirty={}]",
+                                     line.tag, line.data, line.valid,
+                                     line.dirty).as_str());
+
+                if i + 1 != self.lines.len() {
+                    out.push_str("\n");
+                }
+            }
+            i += 1;
+        }
+
+        write!(f, "{}", out)
     }
 }
 
