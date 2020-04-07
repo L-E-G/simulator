@@ -69,9 +69,9 @@ impl fmt::Display for Registers {
                 _ => "",
             };
             if key.len() == 0 {
-                out.push_str(format!("{}", i).as_str());
+                out.push_str(format!("{:5}", i).as_str());
             } else {
-                out.push_str(format!("{}", key).as_str());
+                out.push_str(format!("{:5}", key).as_str());
             }
             
             out.push_str(format!(": {}", self.file[i]).as_str());
