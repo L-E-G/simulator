@@ -207,8 +207,6 @@ impl fmt::Display for DRAM {
             if i + 1 != self.data.len() {
                 out.push_str("\n");
             }
-            
-            i += 1;
         }
 
         write!(f, "{}", out)
@@ -319,15 +317,14 @@ impl fmt::Display for DMCache {
 
         let mut i = 0;
         for line in self.lines.iter() {
-            if line.valid {
-                out.push_str(format!("{} = {} [valid={}, dirty={}]",
-                                     line.tag, line.data, line.valid,
-                                     line.dirty).as_str());
+            out.push_str(format!("{} = {} [valid={}, dirty={}]",
+                                 line.tag, line.data, line.valid,
+                                 line.dirty).as_str());
 
-                if i + 1 != self.lines.len() {
-                    out.push_str("\n");
-                }
+            if i + 1 != self.lines.len() {
+                out.push_str("\n");
             }
+
             i += 1;
         }
 

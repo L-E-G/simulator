@@ -2,7 +2,6 @@ use bit_field::BitField;
 
 use std::cell::RefCell;
 use std::rc::Rc;
-use std::clone::Clone;
 use std::fmt::Debug;
 
 use crate::result::SimResult;
@@ -169,10 +168,8 @@ impl Instruction for Load {
             self.mem_addr = registers[instruction.get_bits(15..=19) as usize];
         } else if self.mem_addr_mode == AddrMode::Immediate {
             self.mem_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
-            println!("PC={}, addr_immediate={}", registers[PC],
-                     instruction.get_bits(15..=31));
         }
-        
+
         return SimResult::Wait(0, ());
     }
 

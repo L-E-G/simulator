@@ -3,6 +3,7 @@ Endianess: MSB ... LSB
 Load register direct
     DEST=R0
     ADDR=R1
+    Addr  Dest  Op  T  Cond
     00001 00000 000 01 00000
     0000 1000 0000 0010 0000
     0x0  0x8  0x0  0x2  0x0
