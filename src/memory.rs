@@ -207,6 +207,8 @@ impl fmt::Display for DRAM {
             if i + 1 != self.data.len() {
                 out.push_str("\n");
             }
+
+            i += 1;
         }
 
         write!(f, "{}", out)

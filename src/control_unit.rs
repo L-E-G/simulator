@@ -21,8 +21,11 @@ pub struct ControlUnit<'a> {
     /// Instruction which resulted from the fetch stage of the pipeline.
     fetch_instruction: Option<u32>,
 
-    /// Instruction current in the decode stage of the pipeline.
+    /// Instruction currently in the decode stage of the pipeline.
     decode_instruction: Option<Box<dyn Instruction>>,
+
+    /// Instruction currently in the execute stage of the pipeline.
+    execute_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
@@ -53,12 +56,14 @@ Registers  :
 Memory     :
 {}
 Instructions:
-    Fetch : {:?}
-    Decode: {:?}",
+    Fetch  : {:?}
+    Decode : {:?}
+    Execute: {:?}",
                self.cycle_count,
                indent(format!("{}", self.registers)),
                indent(format!("{}", self.memory)),
-               self.fetch_instruction, self.decode_instruction)
+               self.fetch_instruction, self.decode_instruction,
+               self.execute_instruction)
     }
 }
 
@@ -72,6 +77,7 @@ impl <'a> ControlUnit<'a> {
             memory: memory,
             fetch_instruction: None,            
             decode_instruction: None,
+            execute_instruction: None,
         }
     }
 
@@ -79,6 +85,20 @@ impl <'a> ControlUnit<'a> {
     /// If Result::Ok is returned the value embedded indicates if the program
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
+        // Execute stage
+        match &self.decode_instruction {
+            None => self.execute_instruction = None,
+            Some(mut decode_inst) => {
+                match (*decode_inst).execute() {
+                    SimResult::Err(e) => return Err(format!("Failed to execute instruction: {}", e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                    },
+                };
+            },
+        };
+        
         // Decode stage
         match self.fetch_instruction {
             None => self.decode_instruction = None,
