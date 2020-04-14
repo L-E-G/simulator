@@ -131,6 +131,47 @@ impl MemoryOp {
     }
 }
 
+pub enum ALUOp {
+    AddRD, AddI,
+    SubRD, SubI,
+    MultRD, MultI,
+    DivRD, DivI,
+    Move,
+}
+
+impl MemoryOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            MemoryOp::AddRD => 0,
+            MemoryOp::AddI => 1,
+            MemoryOp::SubRD => 2,
+            MemoryOp::SubI => 3,
+            MemoryOp::MultRD => 4,
+            MemoryOp::MultI => 5,
+            MemoryOp::DivRD => 6,
+            MemoryOp::DivI => 7,
+            MemoryOp::Move => 8,
+        }
+    }
+
+    /// Matches a value with a MemoryOp.
+    pub fn match_val(val: u32) -> Option<MemoryOp> {
+        match val {
+            0 => Some(MemoryOp::AddRD),
+            1 => Some(MemoryOp::AddI),
+            2 => Some(MemoryOp::SubRD),
+            3 => Some(MemoryOp::SubI),
+            4 => Some(MemoryOp::MultRD),
+            5 => Some(MemoryOp::MultI),
+            6 => Some(MemoryOp::DivRD),
+            7 => Some(MemoryOp::DivI),
+            8 => Some(MemoryOp::Move),
+            _ => None,
+        }
+    }
+}
+
 /// Read a value from an address in memory and place it in a register.
 #[derive(Debug)]
 pub struct Load {
@@ -201,6 +242,9 @@ impl Instruction for Load {
 /// Writes a value in memory from a register.
 #[derive(Debug)]
 pub struct Store {
+    /// Addressing mode for memory address.
+    mem_addr_mode: AddrMode,
+
     /// Address in memory to save value.
     dest_addr: u32,
 
@@ -210,8 +254,9 @@ pub struct Store {
 
 impl Store {
     /// Create an empty store instruction.
-    pub fn new() -> Store {
+    pub fn new(mem_addr_mode: AddrMode) -> Store {
         Store{
+            mem_addr_mode: mem_addr_mode,
             dest_addr: 0,
             value: 0,
         }
@@ -221,10 +266,16 @@ impl Store {
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[((instruction << 17) >> 26) as usize];
-        self.dest_addr = registers[((instruction << 12) >> 26) as usize];
 
-        SimResult::Wait(0, ())
+        self.value = register[instruction.get_bits(10..=14) as usize];
+        
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.dest_addr = registers[instruction.get_bits(15..=19) as usize];
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.dest_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
+        }
+
+        return SimResult::Wait(0, ());
     }
 
     /// No execution stage.
@@ -248,9 +299,9 @@ impl Instruction for Store {
     }
 }
 
-/*
+
 struct Move {
-    dest: usize,
+    dest_reg: usize,
     src_reg: usize,
     value: u32,
 }
@@ -258,7 +309,7 @@ struct Move {
 impl Move {
     pub fn new() -> Move {
         Move{
-            dest: 0,
+            dest_reg: 0,
             src_reg: 0,
             value: 0,
         }
@@ -272,40 +323,32 @@ impl Instruction for Move {
     /// Extract source register that holds the value to move.
     /// Get the value to move and add it to the value field.
     fn decode(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
-        }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+        self.dest_reg = instruction.get_bits(13..=18) as usize;
 
-        self.dest = (instbin << 13) >> 31;
-
-        self.src_reg = (instbin << 18) >> 31;
+        self.src_reg = instruction.get_bits(19..=23) as usize;
 
         self.value = registers[self.src_reg];
-        return SimResult::Wait(0, ());
+        SimResult::Wait(0, ())
     }
 
-    /// Skip, no execution.
+    /// No execution stage.
     fn execute(&mut self) -> SimResult<(), String> {
-        return SimResult::Wait(0, ());
+        SimResult::Wait(0, ())
     }
 
-    /// Skip, no memory accessing.
+    /// No memory accessing.
     fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
-        return SimResult::Wait(0, ());
+        SimResult::Wait(0, ())
     }
 
     /// Set the value of the destination register to the value from the source register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        registers[self.dest] = self.value;
-        return SimResult::Wait(0, ());
+        registers[self.dest_reg] = self.value;
+        SimResult::Wait(0, ())
     }
 }
 
+/*
 struct AddUIImm {
     dest: usize,
     src_reg: usize,

@@ -96,12 +96,22 @@ impl <'a> ControlUnit<'a> {
                                 Load::new(AddrMode::RegisterDirect))),
                             Some(MemoryOp::LoadI) => Ok(Box::new(
                                 Load::new(AddrMode::Immediate))),
-                            // TODO: Make Store instruction take AddrMode parameter
-                            // TODO: Make seperate branch for StoreRD & StoreI
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new())),
+                                Store::new(AddrMode::RegisterDirect))),
+                            Some(MemoryOp::StoreRD) => Ok(Box::new(
+                                Store::new(AddrMode::Immediate))),
+                            
                             _ => Err(format!("Invalid operation code {} for mememory type instruction", iop)),
                         }
+                    },
+                    Some(InstructionT::ALU) => {
+                        let iop = fetch_inst.get_bits(7..=12) as u32;
+
+                        match ALUOp::match_val(iop) {
+                            Some(MemoryOp::Move) => Ok(Box::new(
+                                Store::new())),
+                        }
+
                     },
                     _ => Err(format!("Invalid type value {} for instruction", itype)),
                 };
