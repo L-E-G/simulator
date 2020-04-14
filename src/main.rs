@@ -29,7 +29,7 @@ fn main() {
     let mut program_running = true;
 
     while program_running {
-        println!("====================");
+        println!("===============================");
         match cu.step() {
             Err(e) => panic!("Failed to run processor cycle: {}", e),
             Ok(keep_running) => program_running = keep_running,

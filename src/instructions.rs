@@ -139,34 +139,34 @@ pub enum ALUOp {
     Move,
 }
 
-impl MemoryOp {
+impl ALUOp {
     /// Returns the value of the operation field for the represented operation.
     pub fn value(self) -> u32 {
         match self {
-            MemoryOp::AddRD => 0,
-            MemoryOp::AddI => 1,
-            MemoryOp::SubRD => 2,
-            MemoryOp::SubI => 3,
-            MemoryOp::MultRD => 4,
-            MemoryOp::MultI => 5,
-            MemoryOp::DivRD => 6,
-            MemoryOp::DivI => 7,
-            MemoryOp::Move => 8,
+            ALUOp::AddRD => 0,
+            ALUOp::AddI => 1,
+            ALUOp::SubRD => 2,
+            ALUOp::SubI => 3,
+            ALUOp::MultRD => 4,
+            ALUOp::MultI => 5,
+            ALUOp::DivRD => 6,
+            ALUOp::DivI => 7,
+            ALUOp::Move => 8,
         }
     }
 
     /// Matches a value with a MemoryOp.
-    pub fn match_val(val: u32) -> Option<MemoryOp> {
+    pub fn match_val(val: u32) -> Option<ALUOp> {
         match val {
-            0 => Some(MemoryOp::AddRD),
-            1 => Some(MemoryOp::AddI),
-            2 => Some(MemoryOp::SubRD),
-            3 => Some(MemoryOp::SubI),
-            4 => Some(MemoryOp::MultRD),
-            5 => Some(MemoryOp::MultI),
-            6 => Some(MemoryOp::DivRD),
-            7 => Some(MemoryOp::DivI),
-            8 => Some(MemoryOp::Move),
+            0 => Some(ALUOp::AddRD),
+            1 => Some(ALUOp::AddI),
+            2 => Some(ALUOp::SubRD),
+            3 => Some(ALUOp::SubI),
+            4 => Some(ALUOp::MultRD),
+            5 => Some(ALUOp::MultI),
+            6 => Some(ALUOp::DivRD),
+            7 => Some(ALUOp::DivI),
+            8 => Some(ALUOp::Move),
             _ => None,
         }
     }
@@ -267,7 +267,7 @@ impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
-        self.value = register[instruction.get_bits(10..=14) as usize];
+        self.value = registers[instruction.get_bits(10..=14) as usize];
         
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.dest_addr = registers[instruction.get_bits(15..=19) as usize];
@@ -299,8 +299,8 @@ impl Instruction for Store {
     }
 }
 
-
-struct Move {
+#[derive(Debug)]
+pub struct Move {
     dest_reg: usize,
     src_reg: usize,
     value: u32,
@@ -322,7 +322,7 @@ impl Instruction for Move {
     /// Extract destination register from the instruction.
     /// Extract source register that holds the value to move.
     /// Get the value to move and add it to the value field.
-    fn decode(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
         self.dest_reg = instruction.get_bits(13..=18) as usize;
 
         self.src_reg = instruction.get_bits(19..=23) as usize;

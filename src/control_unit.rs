@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store};
+use crate::instructions::{Instruction,InstructionT,MemoryOp,ALUOp,AddrMode,Load,Store,Move};
 
 /// Responsible for running instructions.
 pub struct ControlUnit<'a> {
@@ -100,7 +100,6 @@ impl <'a> ControlUnit<'a> {
                                 Store::new(AddrMode::RegisterDirect))),
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
                                 Store::new(AddrMode::Immediate))),
-                            
                             _ => Err(format!("Invalid operation code {} for mememory type instruction", iop)),
                         }
                     },
@@ -108,8 +107,9 @@ impl <'a> ControlUnit<'a> {
                         let iop = fetch_inst.get_bits(7..=12) as u32;
 
                         match ALUOp::match_val(iop) {
-                            Some(MemoryOp::Move) => Ok(Box::new(
-                                Store::new())),
+                            Some(ALUOp::Move) => Ok(Box::new(
+                                Move::new())),
+                            _ => Err(format!("Invalid operation code {} for ALU type instruction", iop)),
                         }
 
                     },
