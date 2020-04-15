@@ -24,9 +24,9 @@ pub struct Display {
     button: button::State,
     scroll: scrollable::State,
     prog_ct: u32,
-    dram: DRAM,
-    registers: Registers,
-    cu: ControlUnit<'static>,
+    dram: &'static mut DRAM,
+    registers: &'static mut Registers,
+    cu: Option<ControlUnit<'static>>,
     program_running: bool,
     first: bool,
 }
@@ -57,9 +57,9 @@ impl Application for Display {
                 button: button::State::new(),
                 scroll: scrollable::State::new(),
                 prog_ct: 0,
-                dram: DRAM::new(100),
-                registers: Registers::new(),
-                cu: null,
+                dram: &mut DRAM::new(100),
+                registers: &mut Registers::new(),
+                cu: None,
                 program_running: true,
                 first: true,
             },
@@ -104,7 +104,7 @@ impl Application for Display {
             };
 
             // Run pipeline
-            self.cu = ControlUnit::new(&mut self.registers, &mut self.dram);
+            self.cu = Some(ControlUnit::new(&mut self.registers, &mut self.dram));
             self.first = false;
         }
         
@@ -114,14 +114,19 @@ impl Application for Display {
             .spacing(745)
             .push(
                 Button::new(&mut self.button, Text::new("Step"))
-                    .on_press(
-                        match self.cu.step() {
-                            Err(e) => panic!("Failed to run processor cycle: {}", e),
-                            Ok(keep_running) => {
-                                self.program_running = keep_running;
-                                Message::AddEvent(format!("======================\n{}",self.cu))
-                            }
+                    .on_press( 
+                        match self.cu {
+                            Some(ctrlU) => {
+                                match ctrlU.step() {
+                                    Err(e) => panic!("Failed to run processor cycle: {}", e),
+                                    Ok(keep_running) => {
+                                        self.program_running = keep_running;
+                                        Message::AddEvent(format!("=========================\n{}",ctrlU))
+                                    }
+                                }
+                            },
                         }
+                        
                         
                     ),
             )
