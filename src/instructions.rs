@@ -1,11 +1,9 @@
 use bit_field::BitField;
 
-use std::cell::RefCell;
-use std::rc::Rc;
 use std::fmt::Debug;
 
 use crate::result::SimResult;
-use crate::memory::{Memory,Registers,PC};
+use crate::memory::{Memory,DRAM,Registers,PC};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -19,7 +17,7 @@ pub trait Instruction: Debug {
     fn execute(&mut self) -> SimResult<(), String>;
 
     /// Accesses memory.
-    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String>;
+    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String>;
 
     /// Write results to registers.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String>;
@@ -44,7 +42,7 @@ impl Instruction for Noop {
         SimResult::Wait(0, ())
     }
 
-    fn access_memory(&mut self, _memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+    fn access_memory(&mut self, _memory: &mut DRAM) -> SimResult<(), String> {
         SimResult::Wait(0, ())
     }
 
@@ -220,8 +218,8 @@ impl Instruction for Load {
     }
 
     /// Load value at mem_addr from memory into value.
-    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
-        match memory.borrow_mut().get(self.mem_addr) {
+    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
+        match memory.get(self.mem_addr) {
             SimResult::Err(e) => SimResult::Err(
                 format!("failed to retrieve memory address {}: {}",
                         self.mem_addr, e)),
@@ -284,9 +282,9 @@ impl Instruction for Store {
     }
 
     /// Set address in memory to value.
-    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
         println!("set({}, {}", self.dest_addr, self.value);
-        match memory.borrow_mut().set(self.dest_addr, self.value) {
+        match memory.set(self.dest_addr, self.value) {
             SimResult::Err(e) => SimResult::Err(
                 format!("Failed to store value in {}: {}", self.dest_addr, e)),
             SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
@@ -336,9 +334,9 @@ impl Instruction for Move {
         SimResult::Wait(0, ())
     }
 
-    /// No memory accessing.
-    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
-        SimResult::Wait(0, ())
+    /// Skip, no memory accessing.
+    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
     }
 
     /// Set the value of the destination register to the value from the source register.
@@ -417,7 +415,7 @@ impl Instruction for AddUIImm {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 

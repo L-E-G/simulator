@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,ALUOp,AddrMode,Load,Store,Move};
+use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store};
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
@@ -21,8 +21,17 @@ pub struct ControlUnit {
     /// Instruction which resulted from the fetch stage of the pipeline.
     fetch_instruction: Option<u32>,
 
-    /// Instruction current in the decode stage of the pipeline.
+    /// Instruction currently in the decode stage of the pipeline.
     decode_instruction: Option<Box<dyn Instruction>>,
+
+    /// Instruction currently in the execute stage of the pipeline.
+    execute_instruction: Option<Box<dyn Instruction>>,
+
+    /// Instruction currently in the access memory stage of the pipeline.
+    access_mem_instruction: Option<Box<dyn Instruction>>,
+
+    /// Instruction currently in the write back stage of the pipeline.
+    write_back_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
@@ -53,24 +62,32 @@ Registers  :
 Memory     :
 {}
 Instructions:
-    Fetch : {:?}
-    Decode: {:?}",
+    Fetch        : {:?}
+    Decode       : {:?}
+    Execute      : {:?}
+    Access Memory: {:?}
+    Write Back   : {:?}",
                self.cycle_count,
                indent(format!("{}", self.registers)),
                indent(format!("{}", self.memory)),
-               self.fetch_instruction, self.decode_instruction)
+               self.fetch_instruction, self.decode_instruction,
+               self.execute_instruction, self.access_mem_instruction,
+               self.write_back_instruction)
     }
 }
 
 impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new() -> ControlUnit {
+    pub fn new(dram_f: &str) -> ControlUnit {
         ControlUnit{
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100),
+            memory: DRAM::new(100, dram_f),
             fetch_instruction: None,            
             decode_instruction: None,
+            execute_instruction: None,
+            access_mem_instruction: None,
+            write_back_instruction: None,
         }
     }
 
@@ -78,6 +95,58 @@ impl ControlUnit {
     /// If Result::Ok is returned the value embedded indicates if the program
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
+        //  Write back stage
+        match &mut self.access_mem_instruction {
+            None => self.write_back_instruction = None,
+            Some(access_mem_inst) => {
+                match access_mem_inst.write_back(&mut self.registers) {
+                    SimResult::Err(e) => return Err(
+                        format!("Failed to write back for instruction: {}",
+                                e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                    },
+                };
+
+                self.write_back_instruction = self.access_mem_instruction.take();
+            },
+        }
+        
+        // Access memory stage
+        match &mut self.execute_instruction {
+            None => self.access_mem_instruction = None,
+            Some(exec_inst) => {
+                match exec_inst.access_memory(&mut self.memory) {
+                    SimResult::Err(e) => return Err(
+                        format!("Failed to access memory for instruction: {}",
+                                e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                    },
+                };
+
+                self.access_mem_instruction = self.execute_instruction.take();
+            },
+        };
+        
+        // Execute stage
+        match &mut self.decode_instruction {
+            None => self.execute_instruction = None,
+            Some(decode_inst) => {
+                match decode_inst.execute() {
+                    SimResult::Err(e) => return Err(format!("Failed to execute instruction: {}", e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                    },
+                };
+
+                self.execute_instruction = self.decode_instruction.take();
+            },
+        };
+
         // Decode stage
         match self.fetch_instruction {
             None => self.decode_instruction = None,
@@ -86,7 +155,8 @@ impl ControlUnit {
                 // looking at the type and operation code.
                 let itype = fetch_inst.get_bits(5..=6) as u32;
                 
-                let icreate: Result<Box<dyn Instruction>, String> = match InstructionT::match_val(itype) {
+                let icreate: Result<Box<dyn Instruction>, String> = 
+                    match InstructionT::match_val(itype) {
                     Some(InstructionT::Memory) => {
                         let iop = fetch_inst.get_bits(7..=9) as u32;
 
@@ -95,31 +165,28 @@ impl ControlUnit {
                                 Load::new(AddrMode::RegisterDirect))),
                             Some(MemoryOp::LoadI) => Ok(Box::new(
                                 Load::new(AddrMode::Immediate))),
+                            // TODO: Make Store instruction take AddrMode parameter
+                            // TODO: Make seperate branch for StoreRD & StoreI
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new(AddrMode::RegisterDirect))),
-                            Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new(AddrMode::Immediate))),
-                            _ => Err(format!("Invalid operation code {} for mememory type instruction", iop)),
+                                Store::new())),
+                            _ => Err(format!("Invalid operation code {} for \
+                                              mememory type instruction", iop)),
                         }
                     },
-                    Some(InstructionT::ALU) => {
-                        let iop = fetch_inst.get_bits(7..=12) as u32;
-
-                        match ALUOp::match_val(iop) {
-                            Some(ALUOp::Move) => Ok(Box::new(
-                                Move::new())),
-                            _ => Err(format!("Invalid operation code {} for ALU type instruction", iop)),
-                        }
-
-                    },
-                    _ => Err(format!("Invalid type value {} for instruction", itype)),
+                        _ => Err(format!("Invalid type value {} for instruction",
+                                         itype)),
                 };
 
                 // Run instruction specific decode
                 self.decode_instruction = match icreate {
-                    Err(e) => return Err(format!("Failed to determine type of instruction for bits {}: {}", fetch_inst, e)),
-                    Ok(mut inst_box) => match (*inst_box).decode(fetch_inst, &self.registers) {
-                        SimResult::Err(e) => return Err(format!("Failed to decode instruction {}: {}", fetch_inst, e)),
+                    Err(e) => return Err(format!("Failed to determine type of \
+                                                  instruction for bits {}: {}",
+                                                 fetch_inst, e)),
+                    Ok(mut inst_box) => match (*inst_box).decode(fetch_inst,
+                                                                 &self.registers) {
+                        SimResult::Err(e) => return Err(
+                            format!("Failed to decode instruction {}: {}",
+                                    fetch_inst, e)),
                         SimResult::Wait(wait, _v) => {
                             // Update state
                             self.cycle_count += wait as u32;
@@ -153,6 +220,9 @@ impl ControlUnit {
         self.registers[PC] += 1;
 
         // Determine if program should continue running
-        Ok(self.decode_instruction.is_some() || self.fetch_instruction.is_some())
+            Ok(self.decode_instruction.is_some() ||
+               self.fetch_instruction.is_some() ||
+               self.execute_instruction.is_some() ||
+               self.access_mem_instruction.is_some())
     }
 }
