@@ -32,7 +32,9 @@ struct Display {
     button: button::State,
     scroll: scrollable::State,
     prog_ct: u32,
-    cu: ControlUnit<'static>,
+    // dram: DRAM,
+    // registers: Registers,
+    // cu: ControlUnit<'static>,
     program_running: bool,
 }
 
@@ -57,19 +59,19 @@ impl Application for Display {
                 button: button::State::new(),
                 scroll: scrollable::State::new(),
                 prog_ct: 0,
-                cu: {
-                    let mut dram = DRAM::new(100);
-                    let mut registers = Registers::new();
+                // dram: DRAM::new(100),
+                // registers: Registers::new(),
+                // cu: {
 
-                    // Load DRAM from file
-                    match dram.load_from_file("test-data/example-prog.bin") {
-                        Err(e) => panic!("Failed to load DRAM from file: {}", e),
-                        _ => {},
-                    };
+                //     // Load DRAM from file
+                //     match self.dram.load_from_file("test-data/example-prog.bin") {
+                //         Err(e) => panic!("Failed to load DRAM from file: {}", e),
+                //         _ => {},
+                //     };
 
-                    // Run pipeline
-                    ControlUnit::new(&'static: mut registers, &'static: mut dram)
-                },
+                //     // Run pipeline
+                //     ControlUnit::new(&self.registers, &self.dram)
+                // },
                 program_running: true,
             },
             Command::none()
@@ -105,13 +107,32 @@ impl Application for Display {
 
     fn view(&mut self) -> Element<Message> {
 
+        let mut dram = DRAM::new(100);
+        let mut registers = Registers::new();
+
+        // Load DRAM from file
+        match dram.load_from_file("test-data/example-prog.bin") {
+            Err(e) => panic!("Failed to load DRAM from file: {}", e),
+            _ => {},
+        };
+
+        // Run pipeline
+        let mut cu = ControlUnit::new(&mut registers, &mut dram);
+
         let row = Row::new()
             .push(Text::new(format!("Program Counter: {}", self.prog_ct)))
             .spacing(745)
             .push(
                 Button::new(&mut self.button, Text::new("Step"))
                     .on_press(
-                        Message::AddEvent("Rob was here".to_string())
+                        match cu.step() {
+                            Err(e) => panic!("Failed to run processor cycle: {}", e),
+                            Ok(keep_running) => {
+                                self.program_running = keep_running;
+                                Message::AddEvent(cu.to_string())
+                            }
+                        }
+                        
                     ),
             )
             .width(Length::Fill)
