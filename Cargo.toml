@@ -4,7 +4,13 @@ version = "0.1.0"
 authors = ["Noah Huppert <contact@noahh.io>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "simulator"
+path = "src/lib.rs"
+
+[[bin]]
+name = "simulator"
+path = "src/bin.rs"
 
 [dependencies]
 text_io = "0.1.8"
