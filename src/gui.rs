@@ -15,18 +15,20 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::io;
 use std::io::Write;
+use std::ptr::null;
 
-#[derive(Debug, Default)]
+// #[derive(Debug, Default)]
 pub struct Display {
     last: Vec<String>,
     enabled: bool,
     button: button::State,
     scroll: scrollable::State,
     prog_ct: u32,
-    // dram: DRAM,
-    // registers: Registers,
-    // cu: ControlUnit<'static>,
+    dram: DRAM,
+    registers: Registers,
+    cu: ControlUnit<'static>,
     program_running: bool,
+    first: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -55,20 +57,11 @@ impl Application for Display {
                 button: button::State::new(),
                 scroll: scrollable::State::new(),
                 prog_ct: 0,
-                // dram: DRAM::new(100),
-                // registers: Registers::new(),
-                // cu: {
-
-                //     // Load DRAM from file
-                //     match self.dram.load_from_file("test-data/example-prog.bin") {
-                //         Err(e) => panic!("Failed to load DRAM from file: {}", e),
-                //         _ => {},
-                //     };
-
-                //     // Run pipeline
-                //     ControlUnit::new(&self.registers, &self.dram)
-                // },
+                dram: DRAM::new(100),
+                registers: Registers::new(),
+                cu: null,
                 program_running: true,
+                first: true,
             },
             Command::none()
         )
@@ -103,17 +96,18 @@ impl Application for Display {
 
     fn view(&mut self) -> Element<Message> {
 
-        let mut dram = DRAM::new(100);
-        let mut registers = Registers::new();
-
         // Load DRAM from file
-        match dram.load_from_file("test-data/example-prog.bin") {
-            Err(e) => panic!("Failed to load DRAM from file: {}", e),
-            _ => {},
-        };
+        if self.first == true {
+            match self.dram.load_from_file("test-data/example-prog.bin") {
+                Err(e) => panic!("Failed to load DRAM from file: {}", e),
+                _ => {},
+            };
 
-        // Run pipeline
-        let mut cu = ControlUnit::new(&mut registers, &mut dram);
+            // Run pipeline
+            self.cu = ControlUnit::new(&mut self.registers, &mut self.dram);
+            self.first = false;
+        }
+        
 
         let row = Row::new()
             .push(Text::new(format!("Program Counter: {}", self.prog_ct)))
@@ -121,11 +115,11 @@ impl Application for Display {
             .push(
                 Button::new(&mut self.button, Text::new("Step"))
                     .on_press(
-                        match cu.step() {
+                        match self.cu.step() {
                             Err(e) => panic!("Failed to run processor cycle: {}", e),
                             Ok(keep_running) => {
                                 self.program_running = keep_running;
-                                Message::AddEvent(cu.to_string())
+                                Message::AddEvent(format!("======================\n{}",self.cu))
                             }
                         }
                         
