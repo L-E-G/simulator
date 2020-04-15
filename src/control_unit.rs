@@ -86,10 +86,10 @@ impl <'a> ControlUnit<'a> {
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
         // Execute stage
-        match &self.decode_instruction {
+        match &mut self.decode_instruction {
             None => self.execute_instruction = None,
-            Some(mut decode_inst) => {
-                match (*decode_inst).execute() {
+            Some(decode_inst) => {
+                match decode_inst.execute() {
                     SimResult::Err(e) => return Err(format!("Failed to execute instruction: {}", e)),
                     SimResult::Wait(wait, _v) => {
                         // Update state
@@ -107,7 +107,8 @@ impl <'a> ControlUnit<'a> {
                 // looking at the type and operation code.
                 let itype = fetch_inst.get_bits(5..=6) as u32;
                 
-                let icreate: Result<Box<dyn Instruction>, String> = match InstructionT::match_val(itype) {
+                let icreate: Result<Box<dyn Instruction>, String> = 
+                    match InstructionT::match_val(itype) {
                     Some(InstructionT::Memory) => {
                         let iop = fetch_inst.get_bits(7..=9) as u32;
 
@@ -120,17 +121,24 @@ impl <'a> ControlUnit<'a> {
                             // TODO: Make seperate branch for StoreRD & StoreI
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
                                 Store::new())),
-                            _ => Err(format!("Invalid operation code {} for mememory type instruction", iop)),
+                            _ => Err(format!("Invalid operation code {} for \
+                                              mememory type instruction", iop)),
                         }
                     },
-                    _ => Err(format!("Invalid type value {} for instruction", itype)),
+                        _ => Err(format!("Invalid type value {} for instruction",
+                                         itype)),
                 };
 
                 // Run instruction specific decode
                 self.decode_instruction = match icreate {
-                    Err(e) => return Err(format!("Failed to determine type of instruction for bits {}: {}", fetch_inst, e)),
-                    Ok(mut inst_box) => match (*inst_box).decode(fetch_inst, &self.registers) {
-                        SimResult::Err(e) => return Err(format!("Failed to decode instruction {}: {}", fetch_inst, e)),
+                    Err(e) => return Err(format!("Failed to determine type of \
+                                                  instruction for bits {}: {}",
+                                                 fetch_inst, e)),
+                    Ok(mut inst_box) => match (*inst_box).decode(fetch_inst,
+                                                                 &self.registers) {
+                        SimResult::Err(e) => return Err(
+                            format!("Failed to decode instruction {}: {}",
+                                    fetch_inst, e)),
                         SimResult::Wait(wait, _v) => {
                             // Update state
                             self.cycle_count += wait as u32;
