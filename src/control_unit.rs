@@ -8,15 +8,15 @@ use crate::memory::{Memory,DRAM,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,MemoryOp,ALUOp,AddrMode,Load,Store,Move};
 
 /// Responsible for running instructions.
-pub struct ControlUnit<'a> {
+pub struct ControlUnit {
     /// Processor cycle counter.
     cycle_count: u32,
     
     /// Holds computation registers.
-    registers: &'a mut Registers,
+    registers: Registers,
 
     /// Memory system.
-    memory: &'a mut DRAM,
+    memory: DRAM,
 
     /// Instruction which resulted from the fetch stage of the pipeline.
     fetch_instruction: Option<u32>,
@@ -44,7 +44,7 @@ fn indent(src: String) -> String {
     out
 }
 
-impl <'a> fmt::Display for ControlUnit<'a> {
+impl fmt::Display for ControlUnit {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "\
 Cycle Count: {}
@@ -62,14 +62,13 @@ Instructions:
     }
 }
 
-impl <'a> ControlUnit<'a> {
+impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new(registers: &'a mut Registers, memory: &'a mut DRAM)
-               -> ControlUnit<'a> {
+    pub fn new() -> ControlUnit {
         ControlUnit{
             cycle_count: 0,
-            registers: registers,
-            memory: memory,
+            registers: Registers::new(),
+            memory: DRAM::new(100),
             fetch_instruction: None,            
             decode_instruction: None,
         }
