@@ -4,12 +4,10 @@ mod result;
 mod memory;
 mod instructions;
 mod control_unit;
-mod gui;
 pub use crate::result::SimResult;
 pub use crate::memory::{Registers,Memory,InspectableMemory,DRAM,DMCache};
 pub use crate::instructions::Instruction;
 pub use crate::control_unit::ControlUnit;
-pub use crate::gui::Display;
 
 fn main() {
     let args: Vec<_> = env::args().collect();
@@ -19,7 +17,7 @@ fn main() {
 
     // Run GUI
     if args.len() == 2 && args[1] == "gui" {
-        Display::start();
+        panic!("No GUI implemented at the moment");
     } else {
         // Run text interface
         let mut cu = ControlUnit::new("test-data/example-prog.bin");
