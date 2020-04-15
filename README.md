@@ -15,7 +15,7 @@ There are two components in this repository:
 
 - **Simulator**: Simulator of a processor which implements the LEG specification
 - **Graphical User Interface**: Web app which runs the simulator implementation
-  was web assembly and provides a user interface
+  via web assembly and provides a user interface
   
 The development workflow is different for these components.
 
@@ -76,6 +76,7 @@ npm install
 Then start a web pack development server:
 
 ```
+cd gui
 npm start
 ```
 
