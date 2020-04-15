@@ -29,6 +29,9 @@ pub struct ControlUnit {
 
     /// Instruction currently in the access memory stage of the pipeline.
     access_mem_instruction: Option<Box<dyn Instruction>>,
+
+    /// Instruction currently in the write back stage of the pipeline.
+    write_back_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
@@ -62,12 +65,14 @@ Instructions:
     Fetch        : {:?}
     Decode       : {:?}
     Execute      : {:?}
-    Access Memory: {:?}",
+    Access Memory: {:?}
+    Write Back   : {:?}",
                self.cycle_count,
                indent(format!("{}", self.registers)),
                indent(format!("{}", self.memory)),
                self.fetch_instruction, self.decode_instruction,
-               self.execute_instruction, self.access_mem_instruction)
+               self.execute_instruction, self.access_mem_instruction,
+               self.write_back_instruction)
     }
 }
 
@@ -82,6 +87,7 @@ impl ControlUnit {
             decode_instruction: None,
             execute_instruction: None,
             access_mem_instruction: None,
+            write_back_instruction: None,
         }
     }
 
@@ -89,6 +95,42 @@ impl ControlUnit {
     /// If Result::Ok is returned the value embedded indicates if the program
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
+        //  Write back stage
+        match &mut self.access_mem_instruction {
+            None => self.write_back_instruction = None,
+            Some(access_mem_inst) => {
+                match access_mem_inst.write_back(&mut self.registers) {
+                    SimResult::Err(e) => return Err(
+                        format!("Failed to write back for instruction: {}",
+                                e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                    },
+                };
+
+                self.write_back_instruction = self.access_mem_instruction.take();
+            },
+        }
+        
+        // Access memory stage
+        match &mut self.execute_instruction {
+            None => self.access_mem_instruction = None,
+            Some(exec_inst) => {
+                match exec_inst.access_memory(&mut self.memory) {
+                    SimResult::Err(e) => return Err(
+                        format!("Failed to access memory for instruction: {}",
+                                e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                    },
+                };
+
+                self.access_mem_instruction = self.execute_instruction.take();
+            },
+        };
+        
         // Execute stage
         match &mut self.decode_instruction {
             None => self.execute_instruction = None,
@@ -100,9 +142,11 @@ impl ControlUnit {
                         self.cycle_count += wait as u32;
                     },
                 };
+
+                self.execute_instruction = self.decode_instruction.take();
             },
         };
-        
+
         // Decode stage
         match self.fetch_instruction {
             None => self.decode_instruction = None,
@@ -176,6 +220,9 @@ impl ControlUnit {
         self.registers[PC] += 1;
 
         // Determine if program should continue running
-        Ok(self.decode_instruction.is_some() || self.fetch_instruction.is_some())
+            Ok(self.decode_instruction.is_some() ||
+               self.fetch_instruction.is_some() ||
+               self.execute_instruction.is_some() ||
+               self.access_mem_instruction.is_some())
     }
 }
