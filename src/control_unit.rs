@@ -26,6 +26,9 @@ pub struct ControlUnit<'a> {
 
     /// Instruction currently in the execute stage of the pipeline.
     execute_instruction: Option<Box<dyn Instruction>>,
+
+    /// Instruction currently in the access memory stage of the pipeline.
+    access_mem_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
@@ -56,14 +59,15 @@ Registers  :
 Memory     :
 {}
 Instructions:
-    Fetch  : {:?}
-    Decode : {:?}
-    Execute: {:?}",
+    Fetch        : {:?}
+    Decode       : {:?}
+    Execute      : {:?}
+    Access Memory: {:?}",
                self.cycle_count,
                indent(format!("{}", self.registers)),
                indent(format!("{}", self.memory)),
                self.fetch_instruction, self.decode_instruction,
-               self.execute_instruction)
+               self.execute_instruction, self.access_mem_instruction)
     }
 }
 
@@ -78,6 +82,7 @@ impl <'a> ControlUnit<'a> {
             fetch_instruction: None,            
             decode_instruction: None,
             execute_instruction: None,
+            access_mem_instruction: None,
         }
     }
 
