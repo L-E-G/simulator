@@ -69,7 +69,7 @@ impl Application for Display {
                 button: button::State::new(),
                 scroll: scrollable::State::new(),
                 prog_ct: 0,
-                cu: ControlUnit::new(),
+                cu: ControlUnit::new("test-data/example-prog.bin"),
                 program_running: true,
             },
             Command::none()

@@ -168,7 +168,7 @@ impl ControlUnit {
                             // TODO: Make Store instruction take AddrMode parameter
                             // TODO: Make seperate branch for StoreRD & StoreI
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new())),
+                                Store::new(AddrMode::RegisterDirect))),
                             _ => Err(format!("Invalid operation code {} for \
                                               mememory type instruction", iop)),
                         }

@@ -5,11 +5,9 @@ mod memory;
 mod instructions;
 mod gui;
 mod control_unit;
-mod gui;
 pub use crate::result::SimResult;
 pub use crate::memory::{Memory,InspectableMemory,DRAM,DMCache};
 pub use crate::instructions::Instruction;
-pub use crate::gui::Display;
 pub use crate::control_unit::ControlUnit;
 pub use crate::gui::Display;
 
