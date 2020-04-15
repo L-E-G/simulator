@@ -20,7 +20,14 @@ fn main() {
         panic!("No GUI implemented at the moment");
     } else {
         // Run text interface
-        let mut cu = ControlUnit::new("test-data/example-prog.bin");
+        let mut cu = ControlUnit::new();
+
+        match cu.load_memory_from_file("test-data/example-prog.bin") {
+            Err(e) => panic!("Failed to load initial control unit memory \
+                              from file: {}", e),
+            Ok(_v) => (),
+        };
+      
         let mut program_running = true;
 
         while program_running {

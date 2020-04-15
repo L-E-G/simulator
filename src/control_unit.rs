@@ -78,17 +78,23 @@ Instructions:
 
 impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new(dram_f: &str) -> ControlUnit {
+    pub fn new() -> ControlUnit {
         ControlUnit{
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100, dram_f),
+            memory: DRAM::new(100),
             fetch_instruction: None,            
             decode_instruction: None,
             execute_instruction: None,
             access_mem_instruction: None,
             write_back_instruction: None,
         }
+    }
+
+    /// Loads a memory file into the control unit's memory. See
+    /// DRAM::load_from_file() for details on the expected file structure.
+    pub fn load_memory_from_file(&mut self, f: &str) -> Result<(), String> {
+        self.memory.load_from_file(f)
     }
 
     /// Step through one cycle of the processor. Stores resulting state in self.

@@ -128,15 +128,12 @@ pub struct DRAM {
 }
 
 impl DRAM {
-    pub fn new(delay: u16, dram_f: &str) -> DRAM {
-        let mut d = DRAM{
+    /// Creates a new DRAM structure.
+    pub fn new(delay: u16) -> DRAM {
+        DRAM{
             delay: delay,
             data: HashMap::new(),
-        };
-
-        d.load_from_file(dram_f);
-
-        d
+        }
     }
 
     /// Loads contents of a file into DRAM.
