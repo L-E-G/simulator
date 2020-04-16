@@ -11,7 +11,8 @@ import "./UploadMemFileForm.scss";
 const UploadMemFileForm = (props) => {
     const simulator = useContext(SimulatorContext);
     const [error, setError] = useContext(ErrorContext);
-    
+
+    const [expanded, setExpanded] = useState(true);
     const [fileLoading, setFileLoading] = useState(false);
     const [fileSelected, setFileSelected] = useState(false);
     
@@ -24,6 +25,7 @@ const UploadMemFileForm = (props) => {
 		  props.setDRAM(simulator.get_dram());
 
 		  setFileLoading(false);
+		  setExpanded(false);
 	   } catch(e) {
 		  setError(e);
 		  setFileSelected(false);
@@ -64,19 +66,53 @@ const UploadMemFileForm = (props) => {
 		  }
 	   }
     };
+
+    const doToggleExpanded = () => {
+	   setExpanded(!expanded);
+    };
+
+    const ToggleExpandedButton = () => {
+	   var txt = "▲";
+
+	   if (!expanded) {
+		  txt = "▼";
+	   }
+	   
+	   return (
+		  <Button id="upload-mem-toggle-button" variant="outline-primary" onClick={doToggleExpanded}>
+			 {txt}
+		  </Button>
+	   );
+    };
+
+    const ExpandableBody = () => {
+	   if (expanded) {
+		  return (
+			 <div>
+				<Card.Body>
+				    Upload a file to set the contents of simulator memory.
+				</Card.Body>
+				
+				<Form id="upload-mem-form">
+				    <FormContents />
+				</Form>
+			 </div>
+		  );
+	   }
+
+	   return null;
+    };
     
     return (
 	   <Card id="upload-mem-file">
 		  <Card.Body>
-			 <Card.Title>Memory File</Card.Title>
+			 <Card.Title id="upload-mem-title">
+				<span id="upload-mem-card-title">Memory File</span>
 
-			 <Card.Body>
-				Upload a file to set the contents of simulator memory.
-			 </Card.Body>
-			 
-			 <Form id="upload-mem-form">
-				<FormContents />
-			 </Form>
+				<ToggleExpandedButton />
+			 </Card.Title>
+
+			 <ExpandableBody />
 		  </Card.Body>
 	   </Card>
     );
