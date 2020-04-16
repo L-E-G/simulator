@@ -16,7 +16,7 @@ pub struct ControlUnit {
     registers: Registers,
 
     /// Memory system.
-    memory: DRAM,
+    pub memory: DRAM,
 
     /// Instruction which resulted from the fetch stage of the pipeline.
     fetch_instruction: Option<u32>,

@@ -26,7 +26,7 @@ fn main() {
             Err(e) => panic!("Failed to load initial control unit memory \
                               from file: {}", e),
             Ok(_v) => (),
-        };
+        }
       
         let mut program_running = true;
 
