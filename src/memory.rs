@@ -137,8 +137,8 @@ impl DRAM {
     }
 
     /// Loads contents of a file into DRAM.
-    /// The file should be a binary file. Every 32 bits will be loaded in as a word
-    /// in memory. The address in memory will increment by 1 for word loaded.
+    /// See load_from_reader() for details about the required format of
+    /// this file.
     pub fn load_from_file(&mut self, file_p: &str) -> Result<(), String> {
         // Read file
         let file = match File::open(file_p) {
@@ -149,8 +149,15 @@ impl DRAM {
             },
         };
 
-        let mut reader = BufReader::new(file);
+        // Load
+        self.load_from_reader(file)
+    }
 
+    /// Loads contents of a reader into DRAM.
+    /// The buffer should be binary. Every 32 bits will be loaded in as a word
+    /// in memory. The address in memory will increment by 1 for word loaded.
+    pub fn load_from_reader(&mut self, src: impl Read) -> Result<(), String> {
+        let mut reader = BufReader::new(src);
         let mut addr: u32 = 0;
         let mut buf: [u8; 4] = [0; 4];
 
@@ -160,9 +167,9 @@ impl DRAM {
                     if bytes_read == 0 { // End of file
                         return Ok(());
                     } else if bytes_read != 4 { // Incorrect number of bytes read
-                        return Err(format!("Read {} bytes from DRAM file \"{}\" \
-                                            but expected 4 bytes",
-                                           bytes_read, file_p));
+                        return Err(format!("Read {} bytes from buffer but \
+                                            expected 4 bytes",
+                                           bytes_read));
                     }
 
                     let value: u32 = (buf[3] as u32) |
@@ -174,8 +181,7 @@ impl DRAM {
                     addr += 1;
                 },
                 Err(e) => {
-                    return Err(format!("Failed to read DRAM file \"{}\": {}",
-                                       file_p, e));
+                    return Err(format!("Failed to read buffer: {}", e));
                 },
             }
         }

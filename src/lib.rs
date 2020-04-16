@@ -7,6 +7,7 @@ use console_error_panic_hook;
 extern crate serde_derive;
 
 use std::collections::HashMap;
+use std::io::BufReader;
 
 mod result;
 mod memory;
@@ -15,6 +16,12 @@ mod control_unit;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
 use crate::memory::{Memory,InspectableMemory};
+
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console)]
+    fn log(s: &str);
+}
 
 /// Interface between JavaScript and all simulator functionality.
 #[wasm_bindgen]
@@ -38,10 +45,11 @@ impl Simulator {
     /// Returns addresses and values in DRAM. First returned value is a list of
     /// addresses. Second returned value is a list of values corresponding to
     /// the addresses.
-    pub fn get_addresses(self) -> Result<JsValue, JsValue> {
+    pub fn get_dram(self) -> Result<JsValue, JsValue> {
         match self.control_unit.memory.inspect() {
             Err(e) => {
-                Err(JsValue::from_serde(&format!("failed to inspect DRAM: {}", e)).unwrap())
+                Err(JsValue::from_serde(
+                    &format!("failed to inspect DRAM: {}", e)).unwrap())
             },
             Ok(addresses) => {
                 Ok(JsValue::from_serde(&addresses).unwrap())
@@ -49,35 +57,14 @@ impl Simulator {
         }
     }
 
-    /// Returns valid addresses in DRAM.
-    pub fn get_dram_addresses(self) -> Option<Vec<u32>> {
-        match self.control_unit.memory.inspect() {
-            Err(e) => {
-                println!("Simulator::get_dram_addresses, error: {}", e);
-                None
-            },
-            Ok(v) => {
-                let mut addrs: Vec<u32> = Vec::new();
-                
-                for (key, _value) in v.into_iter() {
-                    addrs.push(key);
-                }
-
-                Some(addrs)
-            },
-        }
-    }
-
-    /// Return value of address in DRAM.
-    pub fn get_dram_address(mut self, address: u32) -> Option<u32> {
-        match (&mut (self.control_unit.memory)).get(address) {
-            SimResult::Err(e) => {
-                println!("Simulator::get_dram_address, error: {}", e);
-                None
-            },
-            SimResult::Wait(_wait, v) => {
-                Some(v)
-            },
+    /// Sets the contents of DRAM based on binary input.
+    /// See DRAM::load_from_reader() for details on the required format of
+    /// the input.
+    pub fn set_dram(&mut self, input: &[u8]) -> Result<(), JsValue> {
+        match self.control_unit.memory.load_from_reader(input) {
+            Err(e) => Err(JsValue::from_serde(
+                &format!("failed to load input into DRAM: {}", e)).unwrap()),
+            Ok(_v) => Ok(()),
         }
     }
 }

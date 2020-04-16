@@ -1,0 +1,60 @@
+@import "./variables.scss";
+
+#upload-mem-file {
+    width: 15rem;
+    margin: 1rem;
+
+    button {
+	   margin-top: 1rem;
+    }
+
+    $input-height: 2.3rem;
+
+    #upload-mem-form {
+	   height: $input-height;
+
+	   button {
+		  margin-top: 0;
+	   }
+    }
+
+    #upload-mem-initial {
+	   .custom-file {
+		  background: $primary;
+		  color: white;
+	   }
+
+	   .custom-file::after {
+		  content: "Select File";
+	   }
+    }
+
+    #upload-mem-load-another {
+	   .custom-file {
+		  background: $red;
+	   }
+
+	   .custom-file::after {
+		  content: "Load Another";
+	   }
+    }
+
+    .custom-file {
+	   text-align: center;
+	   height: $input-height;
+	   line-height: $input-height;
+	   border-radius: 0.2rem;
+	   cursor: pointer;
+	   user-select: none;
+    }
+
+    .custom-file::after {
+	   display: inline-block;
+	   position: relative;
+	   top: -$input-height;
+    }
+
+    .custom-file-input {
+	   height: $input-height;
+    }
+}
