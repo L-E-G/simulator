@@ -4,6 +4,7 @@ module.exports = function override(config, env) {
     const wasmExtensionRegExp = /\.wasm$/;
 
     config.resolve.extensions.push('.wasm');
+    
     // make the file loader ignore wasm files
     let fileLoader = null;
     config.module.rules.forEach(rule => {
