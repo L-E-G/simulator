@@ -9,6 +9,9 @@ import ButtonGroup from "react-bootstrap/ButtonGroup";
 import "./MemoryTable.scss";
 
 const MemoryTable = (props) => {
+    let title = props.title;
+    let memory = props.memory;
+    
     // Value format select
     const FMT_BIN = "Binary";
     const FMT_HEX = "Hex";
@@ -34,8 +37,6 @@ const MemoryTable = (props) => {
     };
     
     // Table rows
-    let memory = props.memory;
-    
     const MemTableItems = () => {
 	   let keys = Object.keys(memory);
 	   
@@ -69,19 +70,22 @@ const MemoryTable = (props) => {
 
     return (
 	   <div>
-		  <Nav className="mem-table-display-select justify-content-end">
-			 <Nav.Item className="mem-table-display-select-label">
-				Value Format
-			 </Nav.Item>
+		  <div>
+			 <h3 className="mem-table-title">{title}</h3>
+			 <Nav className="mem-table-display-select justify-content-end">
+				<Nav.Item className="mem-table-display-select-label">
+				    Value Format
+				</Nav.Item>
 
-			 <Nav.Item>
-				<ButtonGroup onClick={onFormatClick}>
-				    <Button variant={decimalVariant}>{FMT_DECIMAL}</Button>
-				    <Button variant={hexVariant}>{FMT_HEX}</Button>
-				    <Button variant={binaryVariant}>{FMT_BIN}</Button>
-				</ButtonGroup>
-			 </Nav.Item>
-		  </Nav>
+				<Nav.Item>
+				    <ButtonGroup onClick={onFormatClick}>
+					   <Button variant={decimalVariant}>{FMT_DECIMAL}</Button>
+					   <Button variant={hexVariant}>{FMT_HEX}</Button>
+					   <Button variant={binaryVariant}>{FMT_BIN}</Button>
+				    </ButtonGroup>
+				</Nav.Item>
+			 </Nav>
+		  </div>
 		  
 		  <Table striped bordered>
 			 <thead>

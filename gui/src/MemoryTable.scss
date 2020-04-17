@@ -1,5 +1,15 @@
+.mem-table-title {
+    display: inline-block;
+    margin-left: 1rem;
+}
+
 .mem-table-display-select {
     margin-bottom: 1rem !important;
+    float: right;
+
+    h2 {
+	   display: inline-block;
+    }
     
     .mem-table-display-select-label {
 	   height: 2.3rem;

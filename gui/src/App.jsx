@@ -72,7 +72,7 @@ const App = () => {
 
 				<UploadMemFileForm setDRAM={setDRAM} />
 				
-				<MemoryTable memory={dram} />
+				<MemoryTable title="DRAM" memory={dram} />
 			 </SimulatorContext.Provider>
 		  </ErrorContext.Provider>
 	   </div>
