@@ -21,6 +21,8 @@ const MemoryTable = (props) => {
     const [searchAddrs, setSearchAddrs] = useState(true);
     const [searchVals, setSearchVals] = useState(false);
 
+    // TODO: Add buttons to select what we are searching
+
     // Toggle table
     const doToggleExpand = () => {
 	   setExpanded(!expanded);
@@ -82,8 +84,12 @@ const MemoryTable = (props) => {
     // Table rows
     var filteredMemory = [];
 
+    // TODO: Add ability to add alias's for keys (For registers names)
+
     for (var key in memory) {
 	   let keyStr = String(key);
+
+	   // TODO: Filter by formatted value
 
 	   if (keyStr.indexOf(search) !== -1) {
 		  filteredMemory.push({
