@@ -2,11 +2,13 @@ import React, { useState, useContext, useEffect } from "react";
 
 import Navbar from "react-bootstrap/Navbar";
 import Toast from "react-bootstrap/Toast";
+import Button from "react-bootstrap/Button";
 
 import { Simulator } from "simulator";
 
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
+import PipelineDisplay from "./PipelineDisplay.jsx";
 
 import "./App.scss";
 
@@ -52,10 +54,23 @@ const Error = () => {
 
 const App = () => {
     var simulator = new Simulator();
-    // TODO: Figure out why simulator pointer is becoming null
 
-    const [dram, setDRAM] = useState({});
+    const [registers, setRegisters] = useState(simulator.get_registers());
+    const [dram, setDRAM] = useState(simulator.get_dram());
+    const [pipeline, setPipeline] = useState(simulator.get_pipeline());
     const [error, setError] = useState(null);
+    
+    const onStepClick = () => {
+	   try {
+		  simulator.step();
+
+		  setPipeline(simulator.get_registers());
+		  setDRAM(simulator.get_dram());
+		  setPipeline(simulator.get_pipeline());
+	   } catch (e) {
+		  setError(e);
+	   }
+    };
     
     return (
 	   <div className="app">
@@ -66,12 +81,25 @@ const App = () => {
 					   <img src="/logo.png" alt="LEG computer logo" />
 					   <span id="brand-name">LEG Simulator</span>
 				    </Navbar.Brand>
+
+				    <Navbar.Collapse className="justify-content-end">
+					   <Navbar.Text>
+						  <Button id="step-button"
+								variant="secondary"
+								onClick={onStepClick}>
+							 Step
+						  </Button>
+					   </Navbar.Text>
+				    </Navbar.Collapse>
 				</Navbar>
 
 				<Error />
 
 				<UploadMemFileForm setDRAM={setDRAM} />
-				
+
+				<PipelineDisplay pipeline={pipeline} />
+
+				<MemoryTable title="Registers" memory={registers} />
 				<MemoryTable title="DRAM" memory={dram} />
 			 </SimulatorContext.Provider>
 		  </ErrorContext.Provider>

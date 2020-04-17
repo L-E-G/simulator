@@ -25,7 +25,7 @@ const REGISTERS_SIZE: usize = 32;
 #[derive(Clone,Debug,PartialEq)]
 pub struct Registers {
     /// Holds register values
-    file: [u32; REGISTERS_SIZE],
+    pub file: [u32; REGISTERS_SIZE],
 }
 
 /// Interupt link register index

@@ -5,6 +5,7 @@ import Card from "react-bootstrap/Card";
 import Spinner from "react-bootstrap/Spinner";
 
 import { SimulatorContext, ErrorContext } from "./App.jsx";
+import ToggleExpandButton from "./ToggleExpandButton.jsx";
 
 import "./UploadMemFileForm.scss";
 
@@ -67,22 +68,8 @@ const UploadMemFileForm = (props) => {
 	   }
     };
 
-    const doToggleExpanded = () => {
+    const doToggleExpand = () => {
 	   setExpanded(!expanded);
-    };
-
-    const ToggleExpandedButton = () => {
-	   var txt = "▲";
-
-	   if (!expanded) {
-		  txt = "▼";
-	   }
-	   
-	   return (
-		  <Button id="upload-mem-toggle-button" variant="outline-primary" onClick={doToggleExpanded}>
-			 {txt}
-		  </Button>
-	   );
     };
 
     const ExpandableBody = () => {
@@ -109,7 +96,9 @@ const UploadMemFileForm = (props) => {
 			 <Card.Title id="upload-mem-title">
 				<span id="upload-mem-card-title">Memory File</span>
 
-				<ToggleExpandedButton />
+				<ToggleExpandButton id="upload-mem-toggle-button"
+								expanded={expanded}
+				                    doToggleExpand={doToggleExpand}/>
 			 </Card.Title>
 
 			 <ExpandableBody />

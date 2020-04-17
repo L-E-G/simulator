@@ -1,13 +1,14 @@
 use bit_field::BitField;
 
-use std::fmt::Debug;
+use std::fmt;
+use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
-pub trait Instruction: Debug {
+pub trait Instruction: Display + Debug {
     /// Extracts parameters from instruction bits and stores them in the
     /// implementing struct for use by future stages. It also retrieves register
     /// values if necessary and does the same.
@@ -30,6 +31,12 @@ pub struct Noop {}
 impl Noop {
     pub fn new() -> Noop {
         Noop{}
+    }
+}
+
+impl Display for Noop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Noop")
     }
 }
 
@@ -93,6 +100,15 @@ pub enum AddrMode {
     Immediate,
 }
 
+impl Display for AddrMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AddrMode::RegisterDirect => write!(f, "RD"),
+            AddrMode::Immediate => write!(f, "I"),
+        }
+    }
+}
+
 /// Identifies memory operations.
 #[derive(PartialEq,Debug)]
 pub enum MemoryOp {
@@ -143,6 +159,12 @@ pub struct Load {
 
     /// Value loaded from mememory during access_memory.
     value: u32,
+}
+
+impl Display for Load {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Load ({})", self.mem_addr_mode)
+    }
 }
 
 impl Load {
@@ -213,6 +235,12 @@ impl Store {
             dest_addr: 0,
             value: 0,
         }
+    }
+}
+
+impl Display for Store {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Store")
     }
 }
 

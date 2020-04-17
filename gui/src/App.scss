@@ -2,6 +2,10 @@
 
 @import "~bootstrap/scss/bootstrap";
 
+.badge-secondary {
+    color: white;
+}
+
 #header {
     img {
 	   width: 2.5rem;
@@ -16,6 +20,10 @@
 	   margin-left: 10px;
 	   color: white;
     }
+}
+
+#step-button {
+    float: right;
 }
 
 #error-toast {

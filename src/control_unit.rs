@@ -10,28 +10,28 @@ use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store}
 /// Responsible for running instructions.
 pub struct ControlUnit {
     /// Processor cycle counter.
-    cycle_count: u32,
+    pub cycle_count: u32,
     
     /// Holds computation registers.
-    registers: Registers,
+    pub registers: Registers,
 
     /// Memory system.
     pub memory: DRAM,
 
     /// Instruction which resulted from the fetch stage of the pipeline.
-    fetch_instruction: Option<u32>,
+    pub fetch_instruction: Option<u32>,
 
     /// Instruction currently in the decode stage of the pipeline.
-    decode_instruction: Option<Box<dyn Instruction>>,
+    pub decode_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the execute stage of the pipeline.
-    execute_instruction: Option<Box<dyn Instruction>>,
+    pub execute_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the access memory stage of the pipeline.
-    access_mem_instruction: Option<Box<dyn Instruction>>,
+    pub access_mem_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the write back stage of the pipeline.
-    write_back_instruction: Option<Box<dyn Instruction>>,
+    pub write_back_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
