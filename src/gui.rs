@@ -105,7 +105,7 @@ impl Application for Display {
 
     fn view(&mut self) -> Element<Message> {
         let row = Row::new()
-            .push(Text::new(format!("Program Counter: {}", self.prog_ct)))
+            .push(Text::new(format!("Program Counter: {}", PC as u32)))
             .spacing(745)
             .push(
                 Button::new(&mut self.button, Text::new("Step"))

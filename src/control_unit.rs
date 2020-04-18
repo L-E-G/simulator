@@ -95,6 +95,7 @@ impl ControlUnit {
     /// If Result::Ok is returned the value embedded indicates if the program
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
+        println!("Rob");
         //  Write back stage
         match &mut self.access_mem_instruction {
             None => self.write_back_instruction = None,
