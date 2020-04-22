@@ -4,6 +4,9 @@ import styled from "styled-components";
 
 import Navbar from "react-bootstrap/Navbar";
 import Button from "react-bootstrap/Button";
+import Container from "react-bootstrap/Container";
+import Row from "react-bootstrap/Row";
+import Col from "react-bootstrap/Col";
 
 import { Simulator } from "simulator";
 
@@ -94,8 +97,18 @@ const App = () => {
 
 				<PipelineDisplay pipeline={pipeline} />
 
-				<MemoryTable title="Registers" memory={registers} />
-				<MemoryTable title="DRAM" memory={dram} />
+				<Container fluid>
+				    <Row>
+					   <Col>
+						  <MemoryTable
+							 title="Registers"
+							 memory={registers} />
+					   </Col>
+					   <Col>
+						  <MemoryTable title="DRAM" memory={dram} />
+					   </Col>
+				    </Row>
+				</Container>
 			 </SimulatorContext.Provider>
 		  </ErrorContext.Provider>
 	   </div>

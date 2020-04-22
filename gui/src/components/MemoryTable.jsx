@@ -27,7 +27,7 @@ margin-top: 0.2rem;
 margin-left: 1rem;
 `;
 
-const FiltersTitle = styled(Nav.Item)`
+const FiltersTitle = styled.span`
 margin-right: 1rem;
 margin-top: 0.4rem;
 `;
@@ -35,6 +35,11 @@ margin-top: 0.4rem;
 const FiltersNav = styled(Nav)`
 margin-bottom: 1rem !important;
 float: right;
+justify-content: center;
+
+& > .nav-item {
+    margin: 0.5rem;
+}
 `;
 
 const SearchContainer = styled(Nav.Item)`
@@ -45,12 +50,12 @@ border-radius: 0.25rem;
 
 const SearchSettingsToggle = styled(Dropdown.Toggle)`
 &.dropdown-toggle {
-border: none;
-border-left: 1px solid ${colors.primary};
-border-radius: 0;
-display: inline-block;
-background: none;
-color: ${colors.primary};
+    border: none;
+    border-left: 1px solid ${colors.primary};
+    border-radius: 0;
+    display: inline-block;
+    background: none;
+    color: ${colors.primary};
 }
 
 .show > &, &:hover {
@@ -63,9 +68,10 @@ width: 1.5rem;
 `;
 
 const SearchInput = styled(Form.Control)`
-max-width: 16rem;
+max-width: 20rem;
 display: inline-block;
 border: none;
+margin: auto;
 `;
 
 const FormatButtonGroup = styled(ButtonGroup)`
@@ -238,7 +244,7 @@ const MemoryTable = (props) => {
 				doToggleExpand={doToggleExpand} />
 			 <MemTableTitle>{title}</MemTableTitle>
 
-			 <FiltersNav className="justify-content-end">
+			 <FiltersNav>
 				<SearchContainer>
 				    <Form onSubmit={onSearchSubmit} inline>
 					   <Form.Group
@@ -279,12 +285,12 @@ const MemoryTable = (props) => {
 					   </Form.Group>
 				    </Form>
 				</SearchContainer>
-				
-				<FiltersTitle>
-				    Value Format
-				</FiltersTitle>
 
 				<Nav.Item>
+				    <FiltersTitle>
+					   Value Format
+				    </FiltersTitle>
+				    
 				    <FormatButtonGroup onClick={onFormatClick}>
 					   <OutlinedButton active={decimalActive}>
 						  {FMT_DECIMAL}
