@@ -11,10 +11,12 @@ margin-left: 1rem;
 `;
 
 const PipelineDisplay = (props) => {
-    let pipeline = props.pipeline;
+	let pipeline = props.pipeline;
+	
+	console.log(pipeline);
 
     for (var key in pipeline) {
-	   if (pipeline[key] === null) {
+	   if (pipeline[key] === "None") {
 		  pipeline[key] = "Empty";
 	   }
     }

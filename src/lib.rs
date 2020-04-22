@@ -91,32 +91,32 @@ impl Simulator {
     pub fn get_pipeline(&self) -> JsValue {
         let mut status = PipelineStatus{
             cycle_count: self.control_unit.cycle_count,
-            fetch: None,
-            decode: None,
-            execute: None,
-            access_memory: None,
-            write_back: None,
+            fetch: Some(format!("Rob{:?}", self.control_unit.fetch_instruction)),
+            decode: Some(format!("{:?}", self.control_unit.decode_instruction)),
+            execute: Some(format!("{:?}", self.control_unit.execute_instruction)),
+            access_memory: Some(format!("{:?}", self.control_unit.access_mem_instruction)),
+            write_back: Some(format!("{:?}", self.control_unit.write_back_instruction)),
         };
 
-        if let Some(i) = &self.control_unit.fetch_instruction {
-            status.fetch = Some(format!("{}", i));
-        }
+        // if let Some(i) = &self.control_unit.fetch_instruction {
+        //     status.fetch = Some(format!("{:?}", i));
+        // }
 
-        if let Some(i) = &self.control_unit.decode_instruction {
-            status.decode = Some(format!("{}", i));
-        }
+        // if let Some(i) = &self.control_unit.decode_instruction {
+        //     status.decode = Some(format!("{:?}", i));
+        // }
 
-        if let Some(i) = &self.control_unit.execute_instruction {
-            status.execute = Some(format!("{}", i));
-        }
+        // if let Some(i) = &self.control_unit.execute_instruction {
+        //     status.execute = Some(format!("{:?}", i));
+        // }
 
-        if let Some(i) = &self.control_unit.access_mem_instruction {
-            status.access_memory = Some(format!("{}", i));
-        }
+        // if let Some(i) = &self.control_unit.access_mem_instruction {
+        //     status.access_memory = Some(format!("{:?}", i));
+        // }
 
-        if let Some(i) = &self.control_unit.write_back_instruction {
-            status.write_back = Some(format!("{}", i));
-        }
+        // if let Some(i) = &self.control_unit.write_back_instruction {
+        //     status.write_back = Some(format!("{:?}", i));
+        // }
 
         JsValue::from_serde(&status).unwrap()
     }
