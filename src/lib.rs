@@ -28,6 +28,7 @@ extern "C" {
 #[wasm_bindgen]
 #[derive(Serialize,Deserialize)]
 pub struct PipelineStatus {
+    cycle_count: u32,
     fetch: Option<String>,
     decode: Option<String>,
     execute: Option<String>,
@@ -89,6 +90,7 @@ impl Simulator {
     /// Returns the status of pipeline stages.
     pub fn get_pipeline(&self) -> JsValue {
         let mut status = PipelineStatus{
+            cycle_count: self.control_unit.cycle_count,
             fetch: None,
             decode: None,
             execute: None,

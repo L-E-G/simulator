@@ -46,7 +46,6 @@ const PipelineDisplay = (props) => {
 			 </thead>
 			 <tbody>
 				<tr>
-				    <td>0</td>
 				    {statuses}
 				</tr>
 			 </tbody>
