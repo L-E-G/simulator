@@ -8,15 +8,15 @@ import Button from "react-bootstrap/Button";
 import { Simulator } from "simulator";
 
 import logoIcon from "../images/logo.png";
+import stepIcon from "../images/step.png";
 
 import { colors } from "../styles";
+import { SecondaryButton } from "./styled";
 
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
 import PipelineDisplay from "./PipelineDisplay.jsx";
 import Error from "./Error";
-
-import { SecondaryButton } from "./styled";
 
 const SimulatorContext = React.createContext(null);
 const ErrorContext = React.createContext([{}, () => {}]);
@@ -41,6 +41,11 @@ color: white;
 
 const StepButton = styled(SecondaryButton)`
 float: right;
+`;
+
+const StepImg = styled.img`
+width: 1.5rem;
+margin-right: 0.5rem;    
 `;
 
 const App = () => {
@@ -76,6 +81,7 @@ const App = () => {
 				    <Navbar.Collapse className="justify-content-end">
 					   <Navbar.Text>
 						  <StepButton onClick={onStepClick}>
+							 <StepImg src={stepIcon} />
 							 Step
 						  </StepButton>
 					   </Navbar.Text>
