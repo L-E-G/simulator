@@ -29,8 +29,8 @@ const PipelineDisplay = (props) => {
 			 </Badge></h3>
 		  </td>
 	   );
-    });
-
+	});
+	
     return (
 	   <PipelineDiv>
 		  <h3>Pipeline</h3>
