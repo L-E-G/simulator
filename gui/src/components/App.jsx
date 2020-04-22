@@ -1,56 +1,47 @@
 import React, { useState, useContext, useEffect } from "react";
 
+import styled from "styled-components";
+
 import Navbar from "react-bootstrap/Navbar";
-import Toast from "react-bootstrap/Toast";
 import Button from "react-bootstrap/Button";
 
 import { Simulator } from "simulator";
 
+import logoIcon from "../images/logo.png";
+
+import { colors } from "../styles";
+
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
 import PipelineDisplay from "./PipelineDisplay.jsx";
+import Error from "./Error";
 
-import "./App.scss";
+import { SecondaryButton } from "./styled";
 
 const SimulatorContext = React.createContext(null);
 const ErrorContext = React.createContext([{}, () => {}]);
 
-const Error = () => {
-    const [error, setError] = useContext(ErrorContext);
+const AppNavbar = styled(Navbar)`
+background: ${colors.primary};
+`;
 
-    if (error !== null) {
-	   console.error("App error:", error);
+const BrandImg = styled.img`
+width: 2.5rem;
+transition-duration: 1s;
 
-	   // Convert error into string, ensure first letter is uppercase
-	   var strError = String(error);
-	   strError = strError.charAt(0).toUpperCase() + strError.slice(1);
-	   
-	   const doClose = () => {
-		  setError(null);
-	   };
+&:hover {
+  transform: rotate(360deg);
+}
+`;
 
-	   return (
-		  <Toast id="error-toast"
-			    onClose={doClose}>
-			 <Toast.Header>
-				<img src="/error.png"
-				     id="error-icon"
-				     className="rounded mr-2"
-				     alt="Error icon" />
-				
-				<strong className="mr-auto">
-				    Error
-				</strong>
-			 </Toast.Header>
-			 <Toast.Body>
-				{strError}
-			 </Toast.Body>
-		  </Toast>
-	   );
-    }
-    
-    return null;
-};
+const BrandName = styled.span`
+margin-left: 10px;
+color: white;
+`;
+
+const StepButton = styled(SecondaryButton)`
+float: right;
+`;
 
 const App = () => {
     var simulator = new Simulator();
@@ -64,7 +55,7 @@ const App = () => {
 	   try {
 		  simulator.step();
 
-		  setPipeline(simulator.get_registers());
+		  setRegisters(simulator.get_registers());
 		  setDRAM(simulator.get_dram());
 		  setPipeline(simulator.get_pipeline());
 	   } catch (e) {
@@ -73,25 +64,23 @@ const App = () => {
     };
     
     return (
-	   <div className="app">
+	   <div>
 		  <ErrorContext.Provider value={[error, setError]}>
 			 <SimulatorContext.Provider value={simulator}>
-				<Navbar id="header" bg="primary" expand="md">
+				<AppNavbar expand="md">
 				    <Navbar.Brand>
-					   <img src="/logo.png" alt="LEG computer logo" />
-					   <span id="brand-name">LEG Simulator</span>
+					   <BrandImg src={logoIcon} alt="LEG computer logo" />
+					   <BrandName>LEG Simulator</BrandName>
 				    </Navbar.Brand>
 
 				    <Navbar.Collapse className="justify-content-end">
 					   <Navbar.Text>
-						  <Button id="step-button"
-								variant="secondary"
-								onClick={onStepClick}>
+						  <StepButton onClick={onStepClick}>
 							 Step
-						  </Button>
+						  </StepButton>
 					   </Navbar.Text>
 				    </Navbar.Collapse>
-				</Navbar>
+				</AppNavbar>
 
 				<Error />
 

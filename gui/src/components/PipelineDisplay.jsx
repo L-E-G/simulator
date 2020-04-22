@@ -1,9 +1,14 @@
 import React from "react";
 
-import Badge from "react-bootstrap/Badge";
+import styled from "styled-components";
+
 import Table from "react-bootstrap/Table";
 
-import "./PipelineDisplay.scss";
+import { Badge } from "./styled";
+
+const PipelineDiv = styled.div`
+margin-left: 1rem;
+`;
 
 const PipelineDisplay = (props) => {
     let pipeline = props.pipeline;
@@ -25,7 +30,7 @@ const PipelineDisplay = (props) => {
     });
 
     return (
-	   <div className="pipeline">
+	   <PipelineDiv>
 		  <h3>Pipeline</h3>
 
 		  <Table bordered>
@@ -46,7 +51,7 @@ const PipelineDisplay = (props) => {
 				</tr>
 			 </tbody>
 		  </Table>
-	   </div>
+	   </PipelineDiv>
     );
 };
 

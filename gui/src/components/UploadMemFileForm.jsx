@@ -1,17 +1,64 @@
 import React, { useState, useContext } from "react";
+
+import styled from "styled-components";
+
 import Form from "react-bootstrap/Form";
-import Button from "react-bootstrap/Button";
 import Card from "react-bootstrap/Card";
 import Spinner from "react-bootstrap/Spinner";
 
 import { SimulatorContext, ErrorContext } from "./App.jsx";
 import ToggleExpandButton from "./ToggleExpandButton.jsx";
 
-import "./UploadMemFileForm.scss";
+import { colors } from "../styles";
+
+const UploadCard = styled(Card)`
+width: 15rem;
+margin: 1rem;
+`;
+
+const UploadToggleButton = styled(ToggleExpandButton)`
+float: right;
+`;
+
+const UploadCardTitle = styled(Card.Title)`
+margin-bottom: 0;
+`;
+
+const inputHeight = "2.3rem";
+const UploadForm = styled(Form)`
+height: ${inputHeight};
+`;
+
+const UploadFileInput = styled(Form.File)`
+& > .custom-file-input {
+    cursor: pointer;
+}
+
+& > .custom-file-label {
+    text-align: center;
+}
+
+& > .custom-file-label::after {
+    display: none;
+}
+`;
+
+const InitialFileInput = styled(UploadFileInput)`
+& > .custom-file-label {
+    background: ${colors.primary};
+    color: white;
+}
+`;
+
+const ReuploadFileInput = styled(UploadFileInput)`
+& > .custom-file-label {
+    background: ${colors.red};
+}
+`;
 
 const UploadMemFileForm = (props) => {
     const simulator = useContext(SimulatorContext);
-    const [error, setError] = useContext(ErrorContext);
+    const setError = useContext(ErrorContext)[1];
 
     const [expanded, setExpanded] = useState(true);
     const [fileLoading, setFileLoading] = useState(false);
@@ -44,9 +91,11 @@ const UploadMemFileForm = (props) => {
     const FormContents = () => {
 	   if (!fileSelected) {
 		  return (
-			 <div id="upload-mem-initial">
-				<Form.File onChange={onFileChange}
-						 custom />
+			 <div>
+				<InitialFileInput
+				    label="Select File"
+				    onChange={onFileChange}
+				    custom />
 			 </div>
 		  );
 	   } else {
@@ -59,9 +108,11 @@ const UploadMemFileForm = (props) => {
 			 );
 		  } else {
 			 return (
-				<div id="upload-mem-load-another">
-				    <Form.File onChange={onFileChange}
-				               custom />
+				<div>
+				    <ReuploadFileInput
+					   label="Load Another"
+					   onChange={onFileChange}
+				        custom />
 				</div>
 			 );
 		  }
@@ -71,39 +122,31 @@ const UploadMemFileForm = (props) => {
     const doToggleExpand = () => {
 	   setExpanded(!expanded);
     };
-
-    const ExpandableBody = () => {
-	   if (expanded) {
-		  return (
-			 <div>
-				<Card.Body>
-				    Upload a file to set the contents of simulator memory.
-				</Card.Body>
-				
-				<Form id="upload-mem-form">
-				    <FormContents />
-				</Form>
-			 </div>
-		  );
-	   }
-
-	   return null;
-    };
     
     return (
-	   <Card id="upload-mem-file">
+	   <UploadCard>
 		  <Card.Body>
-			 <Card.Title id="upload-mem-title">
-				<span id="upload-mem-card-title">Memory File</span>
+			 <UploadCardTitle>
+				<span>Memory File</span>
 
-				<ToggleExpandButton id="upload-mem-toggle-button"
-								expanded={expanded}
-				                    doToggleExpand={doToggleExpand}/>
-			 </Card.Title>
+				<UploadToggleButton
+				    expanded={expanded}
+				    doToggleExpand={doToggleExpand}/>
+			 </UploadCardTitle>
 
-			 <ExpandableBody />
+			 {expanded &&
+				<div>
+				    <Card.Body>
+					   Upload a file to set the contents of simulator memory.
+				    </Card.Body>
+				    
+				    <UploadForm>
+					   <FormContents />
+				    </UploadForm>
+				</div>
+			 }
 		  </Card.Body>
-	   </Card>
+	   </UploadCard>
     );
 };
 

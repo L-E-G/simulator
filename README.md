@@ -70,16 +70,16 @@ First install its JavasScript dependencies:
 
 ```
 cd gui
-npm install
+yarn install
 ```
 
 Then start a web pack development server:
 
 ```
 cd gui
-npm start
+yarn start
 ```
 
-This server will serve the result on [localhost:8000](http://localhost:8000), 
+This server will serve the result on [localhost:3000](http://localhost:3000), 
 and rebuild the web app whenever anything in `gui` changes, or when a new 
 version of the web pack compiled simulator is built.
