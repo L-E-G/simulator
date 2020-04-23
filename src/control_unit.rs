@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store};
+use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store,ALUOp,Move,Add};
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
@@ -171,16 +171,31 @@ impl ControlUnit {
                                 Load::new(AddrMode::RegisterDirect))),
                             Some(MemoryOp::LoadI) => Ok(Box::new(
                                 Load::new(AddrMode::Immediate))),
-                            // TODO: Make Store instruction take AddrMode parameter
-                            // TODO: Make seperate branch for StoreRD & StoreI
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new())),
+                                Store::new(AddrMode::RegisterDirect))),
+                            Some(MemoryOp::StoreI) => Ok(Box::new(
+                                Store::new(AddrMode::Immediate))),
                             _ => Err(format!("Invalid operation code {} for \
                                               mememory type instruction", iop)),
                         }
                     },
-                        _ => Err(format!("Invalid type value {} for instruction",
-                                         itype)),
+                    // Immediates:
+                    // Unsigned = false
+                    // Signed = true
+                    Some(InstructionT::ALU) => {
+                        let iop = fetch_inst.get_bits(7..=11) as u32;
+
+                        match ALUOp::match_val(iop) {
+                            Some(ALUOp::Move) => Ok(Box::new(
+                                Move::new())),
+                            Some(ALUOp::AddUII) => Ok(Box::new(
+                                Add::new(AddrMode::RegisterDirect, true))),
+                            _ => Err(format!("Invalid operation code {} for \
+                                ALU type instruction", iop)),
+                        }
+                    }
+                    _ => Err(format!("Invalid type value {} for instruction",
+                                        itype)),
                 };
 
                 // Run instruction specific decode

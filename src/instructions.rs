@@ -145,6 +145,108 @@ impl MemoryOp {
     }
 }
 
+/// UI = Unsigned Integer
+/// SI = Signed Integer
+/// RD = Register Direct
+/// I  = Immediate
+#[derive(PartialEq,Debug)]
+pub enum ALUOp {
+    AddUIRD, AddUII, AddSIRD, AddSII,
+    SubUIRD, SubUII, SubSIRD, SubSII,
+    MulUIRD, MulUII, MulSIRD, MulSII, 
+    DivUIRD, DivUII, DivSIRD, DivSII,
+    Move, 
+    CompUI, CompSI, 
+    ASLRD, ASLI, ASRRD, ASRI,
+    LSLRD, LSLI, LSRRD, LSRI,
+    AndRD, AndI,
+    OrRD, OrI,
+    XorRD, XorI,
+    Not, 
+}
+impl ALUOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            ALUOp::AddUIRD => 0,
+            ALUOp::AddUII => 1,
+            ALUOp::AddSIRD => 2,
+            ALUOp::AddSII => 3,
+            ALUOp::SubUIRD => 4,
+            ALUOp::SubUII => 5,
+            ALUOp::SubSIRD => 6,
+            ALUOp::SubSII => 7,
+            ALUOp::MulUIRD => 8,
+            ALUOp::MulUII => 9,
+            ALUOp::MulSIRD => 10,
+            ALUOp::MulSII => 11,
+            ALUOp::DivUIRD => 12,
+            ALUOp::DivUII => 13,
+            ALUOp::DivSIRD => 14,
+            ALUOp::DivSII => 15,
+            ALUOp::Move => 16,
+            ALUOp::CompUI => 17,
+            ALUOp::CompSI => 18,
+            ALUOp::ASLRD => 19,
+            ALUOp::ASLI => 20,
+            ALUOp::ASRRD => 21,
+            ALUOp::ASRI => 22,
+            ALUOp::LSLRD => 23,
+            ALUOp::LSLI => 24,
+            ALUOp::LSRRD => 25,
+            ALUOp::LSRI => 26,
+            ALUOp::AndRD => 27,
+            ALUOp::AndI => 28,
+            ALUOp::OrRD => 29,
+            ALUOp::OrI => 30,
+            ALUOp::XorRD => 31,
+            ALUOp::XorI => 32,
+            ALUOp::Not => 33,
+        }
+    }
+
+    /// Matches a value with a MemoryOp.
+    pub fn match_val(val: u32) -> Option<ALUOp> {
+        match val {
+            0 => Some(ALUOp::AddUIRD),
+            1 => Some(ALUOp::AddUII),
+            2 => Some(ALUOp::AddSIRD),
+            3 => Some(ALUOp::AddSII),
+            4 => Some(ALUOp::SubUIRD),
+            5 => Some(ALUOp::SubUII),
+            6 => Some(ALUOp::SubSIRD),
+            7 => Some(ALUOp::SubSII),
+            8 => Some(ALUOp::MulUIRD),
+            9 => Some(ALUOp::MulUII),
+            10 => Some(ALUOp::MulSIRD),
+            11 => Some(ALUOp::MulSII),
+            12 => Some(ALUOp::DivUIRD),
+            13 => Some(ALUOp::DivUII),
+            14 => Some(ALUOp::DivSIRD),
+            15 => Some(ALUOp::DivSII),
+            16 => Some(ALUOp::Move),
+            17 => Some(ALUOp::CompUI),
+            18 => Some(ALUOp::CompSI),
+            19 => Some(ALUOp::ASLRD),
+            20 => Some(ALUOp::ASLI),
+            21 => Some(ALUOp::ASRRD),
+            22 => Some(ALUOp::ASRI),
+            23 => Some(ALUOp::LSLRD),
+            24 => Some(ALUOp::LSLI),
+            25 => Some(ALUOp::LSRRD),
+            26 => Some(ALUOp::LSRI),
+            27 => Some(ALUOp::AndRD),
+            28 => Some(ALUOp::AndI),
+            29 => Some(ALUOp::OrRD),
+            30 => Some(ALUOp::OrI),
+            31 => Some(ALUOp::XorRD),
+            32 => Some(ALUOp::XorI),
+            33 => Some(ALUOp::Not),
+            _ => None,
+        }
+    }
+}
+
 /// Read a value from an address in memory and place it in a register.
 #[derive(Debug)]
 pub struct Load {
@@ -221,6 +323,8 @@ impl Instruction for Load {
 /// Writes a value in memory from a register.
 #[derive(Debug)]
 pub struct Store {
+    /// Address mode of instruction.
+    mem_addr_mode: AddrMode,
     /// Address in memory to save value.
     dest_addr: u32,
 
@@ -230,8 +334,9 @@ pub struct Store {
 
 impl Store {
     /// Create an empty store instruction.
-    pub fn new() -> Store {
+    pub fn new(mem_addr_mode: AddrMode) -> Store {
         Store{
+            mem_addr_mode: mem_addr_mode,
             dest_addr: 0,
             value: 0,
         }
@@ -247,8 +352,13 @@ impl Display for Store {
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[((instruction << 17) >> 26) as usize];
-        self.dest_addr = registers[((instruction << 12) >> 26) as usize];
+        self.value = registers[instruction.get_bits(10..=14) as usize];
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.dest_addr = registers[instruction.get_bits(15..=19) as usize];
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.dest_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
+        }
 
         SimResult::Wait(0, ())
     }
@@ -274,10 +384,9 @@ impl Instruction for Store {
     }
 }
 
-/*
-struct Move {
+#[derive(Debug)]
+pub struct Move {
     dest: usize,
-    src_reg: usize,
     value: u32,
 }
 
@@ -285,9 +394,14 @@ impl Move {
     pub fn new() -> Move {
         Move{
             dest: 0,
-            src_reg: 0,
             value: 0,
         }
+    }
+}
+
+impl Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Move")
     }
 }
 
@@ -297,30 +411,20 @@ impl Instruction for Move {
     /// Extract destination register from the instruction.
     /// Extract source register that holds the value to move.
     /// Get the value to move and add it to the value field.
-    fn decode(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
-        }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.value = registers[instruction.get_bits(18..=22) as usize];
 
-        self.dest = (instbin << 13) >> 31;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
-        self.src_reg = (instbin << 18) >> 31;
-
-        self.value = registers[self.src_reg];
         return SimResult::Wait(0, ());
     }
 
-    /// Skip, no execution.
+    /// No execution stage.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
-    /// Skip, no memory accessing.
+    /// No memory accessing.
     fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -332,19 +436,22 @@ impl Instruction for Move {
     }
 }
 
-struct AddUIImm {
+#[derive(Debug)]
+pub struct Add {
+    mem_addr_mode: AddrMode,
     dest: usize,
-    src_reg: usize,
-    op1: usize,
-    op2: usize,
-    result: u32,
+    usigned_or_signed: bool,
+    op1: i32,
+    op2: i32,
+    result: i32,
 }
 
-impl AddUIImm {
-    pub fn new() -> AddUIImm {
-        AddUIImm{
+impl Add {
+    pub fn new(mem_addr_mode: AddrMode, usigned_or_signed: bool) -> Add {
+        Add{
+            mem_addr_mode: mem_addr_mode,
+            usigned_or_signed: usigned_or_signed,
             dest: 0,
-            src_reg: 0,
             op1: 0,
             op2: 0,
             result: 0,
@@ -352,7 +459,13 @@ impl AddUIImm {
     }
 }
 
-impl Instruction for AddUIImm {
+impl Display for Add {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Add")
+    }
+}
+
+impl Instruction for Add {
     /// Convert instruction to String, then to &str so we can convert it to a usize
     /// so that we can perform binary operations on it.
     /// Extract the value of the destination register from instruction.
@@ -360,30 +473,19 @@ impl Instruction for AddUIImm {
     /// Extract the value of the source register that stored one of the operands.
     /// Convert the operand from the register to a String, then to a &str so that we 
     /// can convert it to a usize so we can perform binary operations to it.
-    fn decode(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as i32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as i32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.op2 = (((registers[PC] + 1) as i32) + (instruction.get_bits(23..=31) as i32)) as i32;
         }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
 
-        self.dest = (instbin << 13) >> 31;
-
-        self.op2 = (instbin << 23) >> 31;
-
-        self.src_reg = (instbin << 18) >> 31;
-
-        let mut op1String = registers[self.src_reg].to_string();
-        let mut op1str: &str = &op1String[..];
-
-        match usize::from_str_radix(op1str, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => self.op1 = f,
-        }
-        // self.op1 = usize::from_str_radix(op1str, 2).unwrap();
+        
         
         return SimResult::Wait(0, ());
     }
@@ -391,10 +493,11 @@ impl Instruction for AddUIImm {
     /// Execute the binary operation using usize's function checked_add().
     /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
-        match self.op1.checked_add(self.op2) {
-            None => return SimResult::Err("Error".to_string()),
-            Some(f) => self.result = f as u32,
-        }
+        // match self.op1.checked_add(self.op2) {
+        //     None => return SimResult::Err("Failed to Add".to_string()),
+        //     Some(f) => self.result = f as u32,
+        // }
+        self.result = self.op1 + self.op2;
         // self.result = self.op1.checked_add(self.op2).unwrap() as u32;
         return SimResult::Wait(0, ());
     }
@@ -406,11 +509,13 @@ impl Instruction for AddUIImm {
 
     /// Store the value of the result in the destination register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        registers[self.dest] = self.result;
+        registers[self.dest] = self.result as u32;
         return SimResult::Wait(0, ());
     }
 }
-*/
+
+
+// ------------------------------------ Tests ---------------------------------------
 
 #[cfg(test)]
 mod tests {
