@@ -125,6 +125,7 @@ pub trait InspectableMemory<A, D> {
 pub struct DRAM {
     delay: u16,
     data: HashMap<u32, u32>,
+    curr_addr: u32,
 }
 
 impl DRAM {
@@ -133,6 +134,7 @@ impl DRAM {
         DRAM{
             delay: delay,
             data: HashMap::new(),
+            curr_addr: 0,
         }
     }
 
@@ -153,12 +155,20 @@ impl DRAM {
         self.load_from_reader(file)
     }
 
+    pub fn load_from_raw_data(&mut self, data: u32) -> Result<(), String> {
+        let value: u32 = (buf[3] as u32) |
+            (buf[2] as u32) << 8 |
+            (buf[1] as u32) << 16 |
+            (buf[0] as u32) << 24;
+            
+    }
+
     /// Loads contents of a reader into DRAM.
     /// The buffer should be binary. Every 32 bits will be loaded in as a word
     /// in memory. The address in memory will increment by 1 for word loaded.
     pub fn load_from_reader(&mut self, src: impl Read) -> Result<(), String> {
         let mut reader = BufReader::new(src);
-        let mut addr: u32 = 0;
+        // let mut addr: u32 = 0;
         let mut buf: [u8; 4] = [0; 4];
 
         loop {
@@ -177,8 +187,8 @@ impl DRAM {
                         (buf[1] as u32) << 16 |
                         (buf[0] as u32) << 24;
                     
-                    self.data.insert(addr, value);
-                    addr += 1;
+                    self.data.insert(self.curr_addr, value);
+                    self.curr_addr += 1;
                 },
                 Err(e) => {
                     return Err(format!("Failed to read buffer: {}", e));
