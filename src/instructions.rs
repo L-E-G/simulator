@@ -487,14 +487,8 @@ impl Display for ArithI {
     }
 }
 
+/// The one instruction that takes care of all arithmetic instructions
 impl Instruction for ArithI {
-    /// Convert instruction to String, then to &str so we can convert it to a usize
-    /// so that we can perform binary operations on it.
-    /// Extract the value of the destination register from instruction.
-    /// Extract the value of the immediate value.
-    /// Extract the value of the source register that stored one of the operands.
-    /// Convert the operand from the register to a String, then to a &str so that we 
-    /// can convert it to a usize so we can perform binary operations to it.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
         self.dest = instruction.get_bits(13..=17) as usize;
@@ -567,13 +561,6 @@ impl Display for Comp {
 }
 
 impl Instruction for Comp {
-    /// Convert instruction to String, then to &str so we can convert it to a usize
-    /// so that we can perform binary operations on it.
-    /// Extract the value of the destination register from instruction.
-    /// Extract the value of the immediate value.
-    /// Extract the value of the source register that stored one of the operands.
-    /// Convert the operand from the register to a String, then to a &str so that we 
-    /// can convert it to a usize so we can perform binary operations to it.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
         self.op1 = registers[instruction.get_bits(13..=17) as usize] as u32;
@@ -604,6 +591,150 @@ impl Instruction for Comp {
         } else {
             registers[STS] = 1;
         }
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+
+#[derive(Debug)]
+pub struct AS {
+    mem_addr_mode: AddrMode,
+    direction: bool,
+    dest: usize,
+    op: u32,
+    amount: u32,
+    result: u32,
+}
+
+impl AS {
+    // direction: Left = false, right = true
+    pub fn new(mem_addr_mode: AddrMode, d: bool) -> AS {
+        AS{
+            mem_addr_mode: mem_addr_mode,
+            direction: d,
+            dest: 0,
+            op: 0,
+            amount: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for AS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Arithmetic Shift")
+    }
+}
+
+impl Instruction for AS {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.amount = registers[instruction.get_bits(18..=22) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.amount = (((registers[PC] + 1) as i32) + (instruction.get_bits(18..=31) as i32)) as u32;
+        }
+        
+        self.op = registers[self.dest] as u32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        if self.direction {
+            self.result = self.op << self.amount;
+        } else {
+            self.result = self.op >> self.amount;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result;
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+
+#[derive(Debug)]
+pub struct LS {
+    mem_addr_mode: AddrMode,
+    direction: bool,
+    dest: usize,
+    op: i32,
+    amount: i32,
+    result: i32,
+}
+
+impl LS {
+    // direction: Left = false, right = true
+    pub fn new(mem_addr_mode: AddrMode, d: bool) -> LS {
+        LS{
+            mem_addr_mode: mem_addr_mode,
+            direction: d,
+            dest: 0,
+            op: 0,
+            amount: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for LS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Arithmetic Shift")
+    }
+}
+
+impl Instruction for LS {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.amount = registers[instruction.get_bits(18..=22) as usize] as i32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.amount = (((registers[PC] + 1) as i32) + (instruction.get_bits(18..=31) as i32)) as i32;
+        }
+        
+        self.op = registers[self.dest] as i32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        if self.direction {
+            self.result = self.op << self.amount;
+        } else {
+            self.result = self.op >> self.amount;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result as u32;
         
         return SimResult::Wait(0, ());
     }
