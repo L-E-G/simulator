@@ -5,7 +5,7 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store,ALUOp,Move,Add};
+use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store,ArithMode,ALUOp,Move,ArithI};
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
@@ -185,11 +185,15 @@ impl ControlUnit {
                     Some(InstructionT::ALU) => {
                         let iop = fetch_inst.get_bits(7..=11) as u32;
 
-                        match ALUOp::match_val(iop) {
+                        match ALUOp::match_val(iop) {    // Don't quite know how to add sign/unsign
                             Some(ALUOp::Move) => Ok(Box::new(
                                 Move::new())),
+                            Some(ALUOp::AddUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
                             Some(ALUOp::AddUII) => Ok(Box::new(
-                                Add::new(AddrMode::RegisterDirect, true))),
+                                ArithI::new(AddrMode::Immediate, ArithMode::Add))),
+                            Some(ALUOp::AddSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
                             _ => Err(format!("Invalid operation code {} for \
                                 ALU type instruction", iop)),
                         }

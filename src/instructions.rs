@@ -109,6 +109,28 @@ impl Display for AddrMode {
     }
 }
 
+#[derive(PartialEq,Debug)]
+pub enum ArithMode {
+    Add,
+
+    Sub,
+
+    Mul,
+
+    Div,
+}
+
+impl Display for ArithMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArithMode::Add => write!(f, "Add"),
+            ArithMode::Sub => write!(f, "Sub"),
+            ArithMode::Mul => write!(f, "Mult"),
+            ArithMode::Div => write!(f, "Div"),
+        }
+    }
+}
+
 /// Identifies memory operations.
 #[derive(PartialEq,Debug)]
 pub enum MemoryOp {
@@ -437,20 +459,20 @@ impl Instruction for Move {
 }
 
 #[derive(Debug)]
-pub struct Add {
+pub struct ArithI {
     mem_addr_mode: AddrMode,
     dest: usize,
-    usigned_or_signed: bool,
+    operation: ArithMode,
     op1: i32,
     op2: i32,
     result: i32,
 }
 
-impl Add {
-    pub fn new(mem_addr_mode: AddrMode, usigned_or_signed: bool) -> Add {
-        Add{
+impl ArithI {
+    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> ArithI {
+        ArithI{
             mem_addr_mode: mem_addr_mode,
-            usigned_or_signed: usigned_or_signed,
+            operation: operation,
             dest: 0,
             op1: 0,
             op2: 0,
@@ -459,13 +481,13 @@ impl Add {
     }
 }
 
-impl Display for Add {
+impl Display for ArithI {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Add")
+        write!(f, "ArithI")
     }
 }
 
-impl Instruction for Add {
+impl Instruction for ArithI {
     /// Convert instruction to String, then to &str so we can convert it to a usize
     /// so that we can perform binary operations on it.
     /// Extract the value of the destination register from instruction.
@@ -497,7 +519,14 @@ impl Instruction for Add {
         //     None => return SimResult::Err("Failed to Add".to_string()),
         //     Some(f) => self.result = f as u32,
         // }
-        self.result = self.op1 + self.op2;
+
+        match self.operation {
+            ArithMode::Add => self.result = self.op1 + self.op2,
+            ArithMode::Sub => self.result = self.op1 - self.op2,
+            ArithMode::Mul => self.result = self.op1 * self.op2,
+            ArithMode::Div => self.result = self.op1 / self.op2,
+        }
+        
         // self.result = self.op1.checked_add(self.op2).unwrap() as u32;
         return SimResult::Wait(0, ());
     }
@@ -513,6 +542,10 @@ impl Instruction for Add {
         return SimResult::Wait(0, ());
     }
 }
+
+
+
+
 
 
 // ------------------------------------ Tests ---------------------------------------
