@@ -8,7 +8,7 @@ use crate::memory::{Memory,DRAM,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,
     ArithMode,ALUOp,Move,ArithI,Comp,
-    AS,LS,
+    AS,LS,LogicType,ThreeOpLogic,
 };
 
 /// Responsible for running instructions.
@@ -251,6 +251,20 @@ impl ControlUnit {
                                 LS::new(AddrMode::RegisterDirect, true))),
                             Some(ALUOp::LSRI) => Ok(Box::new(
                                 LS::new(AddrMode::Immediate, true))),
+                            // ---- 3 Operation Logic ----
+                            Some(ALUOp::AndRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::And))),
+                            Some(ALUOp::AndI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::And))),
+                            Some(ALUOp::OrRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::Or))),
+                            Some(ALUOp::OrI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::Or))),
+                            Some(ALUOp::XorRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::Xor))),
+                            Some(ALUOp::XorI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::Xor))),
+                            
                             _ => Err(format!("Invalid operation code {} for \
                                 ALU type instruction", iop)),
                         }

@@ -112,11 +112,8 @@ impl Display for AddrMode {
 #[derive(PartialEq,Debug)]
 pub enum ArithMode {
     Add,
-
     Sub,
-
     Mul,
-
     Div,
 }
 
@@ -127,6 +124,23 @@ impl Display for ArithMode {
             ArithMode::Sub => write!(f, "Sub"),
             ArithMode::Mul => write!(f, "Mult"),
             ArithMode::Div => write!(f, "Div"),
+        }
+    }
+}
+
+#[derive(PartialEq,Debug)]
+pub enum LogicType {
+    And,
+    Or,
+    Xor,
+}
+
+impl Display for LogicType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogicType::And => write!(f, "And"),
+            LogicType::Or => write!(f, "Or"),
+            LogicType::Xor => write!(f, "Xor"),
         }
     }
 }
@@ -695,7 +709,7 @@ impl LS {
 
 impl Display for LS {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Arithmetic Shift")
+        write!(f, "Logical Shift")
     }
 }
 
@@ -741,7 +755,76 @@ impl Instruction for LS {
 }
 
 
+#[derive(Debug)]
+pub struct ThreeOpLogic {
+    mem_addr_mode: AddrMode,
+    OpType: LogicType,
+    dest: usize,
+    op1: u32,
+    op2: u32,
+    result: u32,
+}
 
+impl ThreeOpLogic {
+    // direction: Left = false, right = true
+    pub fn new(mem_addr_mode: AddrMode, LT: LogicType) -> ThreeOpLogic {
+        ThreeOpLogic{
+            mem_addr_mode: mem_addr_mode,
+            OpType: LT,
+            dest: 0,
+            op1: 0,
+            op2: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for ThreeOpLogic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "3 Operation Logic")
+    }
+}
+
+impl Instruction for ThreeOpLogic {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.op2 = (((registers[PC] + 1) as i32) + (instruction.get_bits(23..=31) as i32)) as u32;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        match self.OpType {
+            LogicType::And => self.result = self.op1 & self.op2,
+            LogicType::Or => self.result = self.op1 | self.op2,
+            LogicType::Xor => self.result = self.op1 ^ self.op2,
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result;
+        
+        return SimResult::Wait(0, ());
+    }
+}
 
 // ------------------------------------ Tests ---------------------------------------
 
