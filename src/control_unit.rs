@@ -8,7 +8,7 @@ use crate::memory::{Memory,DRAM,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,
     ArithMode,ALUOp,Move,ArithI,Comp,
-    AS,
+    AS,LS,
 };
 
 /// Responsible for running instructions.
@@ -242,6 +242,15 @@ impl ControlUnit {
                                 AS::new(AddrMode::RegisterDirect, true))),
                             Some(ALUOp::ASRI) => Ok(Box::new(
                                 AS::new(AddrMode::Immediate, true))),
+                            // ---- Logical Shift ----
+                            Some(ALUOp::LSLRD) => Ok(Box::new(
+                                LS::new(AddrMode::RegisterDirect, false))),
+                            Some(ALUOp::LSLI) => Ok(Box::new(
+                                LS::new(AddrMode::Immediate, false))),
+                            Some(ALUOp::LSRRD) => Ok(Box::new(
+                                LS::new(AddrMode::RegisterDirect, true))),
+                            Some(ALUOp::LSRI) => Ok(Box::new(
+                                LS::new(AddrMode::Immediate, true))),
                             _ => Err(format!("Invalid operation code {} for \
                                 ALU type instruction", iop)),
                         }
