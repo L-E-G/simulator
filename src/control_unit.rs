@@ -5,7 +5,10 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store,ArithMode,ALUOp,Move,ArithI};
+use crate::instructions::{Instruction,InstructionT,
+    MemoryOp,AddrMode,Load,Store,
+    ArithMode,ALUOp,Move,ArithI,Comp,
+};
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
@@ -188,12 +191,47 @@ impl ControlUnit {
                         match ALUOp::match_val(iop) {    // Don't quite know how to add sign/unsign
                             Some(ALUOp::Move) => Ok(Box::new(
                                 Move::new())),
+                            // ---- Add ----
                             Some(ALUOp::AddUIRD) => Ok(Box::new(
                                 ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
                             Some(ALUOp::AddUII) => Ok(Box::new(
                                 ArithI::new(AddrMode::Immediate, ArithMode::Add))),
                             Some(ALUOp::AddSIRD) => Ok(Box::new(
                                 ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                            Some(ALUOp::AddSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Add))),
+                            // ---- Sub ----
+                            Some(ALUOp::SubUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                            Some(ALUOp::SubUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Sub))),
+                            Some(ALUOp::SubSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                            Some(ALUOp::SubSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Sub))),
+                            // ---- Mul ----
+                            Some(ALUOp::MulUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                            Some(ALUOp::MulUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Mul))),
+                            Some(ALUOp::MulSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                            Some(ALUOp::MulSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Mul))),
+                            // ---- Div ----
+                            Some(ALUOp::DivUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                            Some(ALUOp::DivUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Div))),
+                            Some(ALUOp::DivSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                            Some(ALUOp::DivSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Div))),
+                            
+                            Some(ALUOp::CompUI) => Ok(Box::new(
+                                Comp::new(false))),
+                            Some(ALUOp::CompUI) => Ok(Box::new(
+                                Comp::new(true))),
                             _ => Err(format!("Invalid operation code {} for \
                                 ALU type instruction", iop)),
                         }

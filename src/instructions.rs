@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC};
+use crate::memory::{Memory,DRAM,Registers,PC,STS};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -543,7 +543,71 @@ impl Instruction for ArithI {
     }
 }
 
+#[derive(Debug)]
+pub struct Comp {
+    signed_or_unsigned: bool,
+    op1: u32,
+    op2: u32,
+}
 
+impl Comp {
+    pub fn new(s_or_u: bool) -> Comp {
+        Comp{
+            signed_or_unsigned: s_or_u,
+            op1: 0,
+            op2: 0,
+        }
+    }
+}
+
+impl Display for Comp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Comp")
+    }
+}
+
+impl Instruction for Comp {
+    /// Convert instruction to String, then to &str so we can convert it to a usize
+    /// so that we can perform binary operations on it.
+    /// Extract the value of the destination register from instruction.
+    /// Extract the value of the immediate value.
+    /// Extract the value of the source register that stored one of the operands.
+    /// Convert the operand from the register to a String, then to a &str so that we 
+    /// can convert it to a usize so we can perform binary operations to it.
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.op1 = registers[instruction.get_bits(13..=17) as usize] as u32;
+
+        self.op2 = registers[instruction.get_bits(18..=22) as usize] as u32;
+        
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        
+        if self.op1 < self.op2 {
+            registers[STS] = 3;
+        } else if self.op1 > self.op2 {
+            registers[STS] = 2;
+        } else {
+            registers[STS] = 1;
+        }
+        
+        return SimResult::Wait(0, ());
+    }
+}
 
 
 
