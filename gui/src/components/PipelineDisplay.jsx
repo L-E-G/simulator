@@ -22,7 +22,7 @@ const PipelineDisplay = (props) => {
     const statuses = Object.keys(pipeline).map((key) => {
 	   return (
 		  <td key={key}>
-			 <h3><Badge variant="secondary">
+			 <h3><Badge>
 				{pipeline[key]}
 			 </Badge></h3>
 		  </td>

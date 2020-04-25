@@ -70,6 +70,15 @@ const App = () => {
 		  setError(e);
 	   }
     };
+
+    const regAddrAliases = {
+	   26: "INTLR",
+	   27: "IHDLR",
+	   28: "PC",
+	   29: "STATUS",
+	   30: "SP",
+	   31: "LR",
+    };
     
     return (
 	   <div>
@@ -102,6 +111,7 @@ const App = () => {
 					   <Col>
 						  <MemoryTable
 							 title="Registers"
+						      keyAliases={regAddrAliases}
 							 memory={registers} />
 					   </Col>
 					   <Col>

@@ -2,8 +2,6 @@ import React from "react";
 
 import styled from "styled-components";
 
-import Button from "react-bootstrap/Button";
-
 import { OutlinedButton } from "./styled";
 
 const ToggleButton = styled(OutlinedButton)`
