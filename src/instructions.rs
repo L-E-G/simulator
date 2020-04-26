@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR};
+use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR,INTLR};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -86,6 +86,29 @@ impl InstructionT {
             2 => Some(InstructionT::Control),
             3 => Some(InstructionT::Graphics),
             _ => None,
+        }
+    }
+}
+
+pub enum InterruptCodes {
+    UPARROW, DOWNARROW, LEFTARROW, 
+    RIGHTARROW, ENTER, ESCAPE, SPACE, 
+    NOT_SET_INITIAL, NOT_SET, SET
+}
+
+impl InterruptCodes {
+    pub fn value(self) -> usize {
+        match self {
+            InterruptCodes::UPARROW => 0000,
+            InterruptCodes::DOWNARROW => 0001,
+            InterruptCodes::LEFTARROW => 0010,
+            InterruptCodes::RIGHTARROW => 0011,
+            InterruptCodes::ENTER => 0100,
+            InterruptCodes::ESCAPE => 0101,
+            InterruptCodes::SPACE => 0110,
+            InterruptCodes::NOT_SET_INITIAL => 11111111111111111111,
+            InterruptCodes::NOT_SET => 000000,
+            InterruptCodes::SET => 100000,
         }
     }
 }
@@ -558,28 +581,17 @@ impl Instruction for ArithI {
         } else if self.mem_addr_mode == AddrMode::Immediate {
             self.op2 = (((registers[PC] + 1) as i32) + (instruction.get_bits(23..=31) as i32)) as i32;
         }
-
-        
         
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
-        // match self.op1.checked_add(self.op2) {
-        //     None => return SimResult::Err("Failed to Add".to_string()),
-        //     Some(f) => self.result = f as u32,
-        // }
-
         match self.operation {
             ArithMode::Add => self.result = self.op1 + self.op2,
             ArithMode::Sub => self.result = self.op1 - self.op2,
             ArithMode::Mul => self.result = self.op1 * self.op2,
             ArithMode::Div => self.result = self.op1 / self.op2,
         }
-        
-        // self.result = self.op1.checked_add(self.op2).unwrap() as u32;
         return SimResult::Wait(0, ());
     }
 
@@ -628,8 +640,6 @@ impl Instruction for Comp {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -701,8 +711,6 @@ impl Instruction for AS {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         if self.direction {
             self.result = self.op << self.amount;
@@ -773,8 +781,6 @@ impl Instruction for LS {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         if self.direction {
             self.result = self.op << self.amount;
@@ -810,7 +816,6 @@ pub struct ThreeOpLogic {
 }
 
 impl ThreeOpLogic {
-    // direction: Left = false, right = true
     pub fn new(mem_addr_mode: AddrMode, LT: LogicType) -> ThreeOpLogic {
         ThreeOpLogic{
             mem_addr_mode: mem_addr_mode,
@@ -845,8 +850,6 @@ impl Instruction for ThreeOpLogic {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         match self.OpType {
             LogicType::And => self.result = self.op1 & self.op2,
@@ -878,7 +881,6 @@ pub struct Not {
 }
 
 impl Not {
-    // direction: Left = false, right = true
     pub fn new() -> Not {
         Not{
             dest: 0,
@@ -903,8 +905,6 @@ impl Instruction for Not {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -914,9 +914,9 @@ impl Instruction for Not {
         return SimResult::Wait(0, ());
     }
 
-    /// Store the value of the result in the destination register.
+    /// Store the value of the result in the destination register and invert it.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        registers[self.dest] = !self.op;;
+        registers[self.dest] = !self.op;
         
         return SimResult::Wait(0, ());
     }
@@ -933,7 +933,6 @@ pub struct Jump {
 }
 
 impl Jump {
-    // direction: Left = false, right = true
     pub fn new(mem_addr_mode: AddrMode, is_sub: bool) -> Jump {
         Jump{
             mem_addr_mode: mem_addr_mode,
@@ -955,7 +954,7 @@ impl Instruction for Jump {
         self.condition = instruction.get_bits(0..=4) as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.addr = instruction.get_bits(10..=14) as u32;
+            self.addr = registers[instruction.get_bits(10..=14) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
             self.addr = instruction.get_bits(10..=31) as u32;
         }
@@ -963,8 +962,6 @@ impl Instruction for Jump {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -974,7 +971,6 @@ impl Instruction for Jump {
         return SimResult::Wait(0, ());
     }
 
-    /// Store the value of the result in the destination register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         if self.condition == registers[STS] {
             if self.is_sub {
@@ -999,7 +995,6 @@ pub struct SIH {
 }
 
 impl SIH {
-    // direction: Left = false, right = true
     pub fn new() -> SIH {
         SIH{
             addr: 0,
@@ -1020,8 +1015,6 @@ impl Instruction for SIH {
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -1031,10 +1024,82 @@ impl Instruction for SIH {
         return SimResult::Wait(0, ());
     }
 
-    /// Store the value of the result in the destination register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         registers[IHDLR] = self.addr;
         
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct INT {
+    mem_addr_mode: AddrMode,
+    proceed: bool,
+    code: u32,
+    addr: u32,
+}
+
+impl INT {
+    pub fn new(mem_addr_mode: AddrMode) -> INT {
+        INT{
+            mem_addr_mode: mem_addr_mode,
+            proceed: false,
+            code: 0,
+            addr: 0,
+        }
+    }
+}
+
+impl Display for INT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Perform Interrupt")
+    }
+}
+
+impl Instruction for INT {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.code = registers[instruction.get_bits(10..=14) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.code = instruction.get_bits(10..=13) as u32;
+        }
+
+        if registers[STS] != InterruptCodes::NOT_SET as u32 {
+            if registers[IHDLR] != InterruptCodes::NOT_SET_INITIAL as u32 {
+                self.proceed = true;
+            }
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        if self.proceed {
+            match memory.set(1111111111, self.code) {
+                SimResult::Err(e) => SimResult::Err(format!("Failed to store interrupt code, value in {}: {}", self.code, e)),
+                SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
+            }
+        }
+        else {return SimResult::Wait(0, ());}
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+
+        if self.proceed {
+            self.proceed = true;
+            registers[STS] = InterruptCodes::SET as u32;
+            registers[INTLR] = registers[PC];
+            registers[PC] = registers[IHDLR];
+        }
+
         return SimResult::Wait(0, ());
     }
 }
