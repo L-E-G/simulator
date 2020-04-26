@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC,STS,LR};
+use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -988,6 +988,52 @@ impl Instruction for Jump {
             }
         }
         
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct SIH {
+    addr: u32,
+}
+
+impl SIH {
+    // direction: Left = false, right = true
+    pub fn new() -> SIH {
+        SIH{
+            addr: 0,
+        }
+    }
+}
+
+impl Display for SIH {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SIH")
+    }
+}
+
+impl Instruction for SIH {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.addr = instruction.get_bits(10..=14) as u32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[IHDLR] = self.addr;
         
         return SimResult::Wait(0, ());
     }

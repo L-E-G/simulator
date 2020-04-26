@@ -9,7 +9,7 @@ use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,
     ArithMode,ALUOp,Move,ArithI,Comp,
     AS,LS,LogicType,ThreeOpLogic,Not,
-    ControlOp,Jump,
+    ControlOp,Jump,SIH,
 };
 
 /// Responsible for running instructions.
@@ -196,6 +196,8 @@ impl ControlUnit {
                                 Jump::new(AddrMode::RegisterDirect, true))),
                             Some(ControlOp::JmpSI) => Ok(Box::new(
                                 Jump::new(AddrMode::Immediate, true))),
+                            Some(ControlOp::Sih) => Ok(Box::new(
+                                SIH::new())),
                             _ => Err(format!("Invalid operation code {} for \
                                             Control type instruction", iop)),
                         }
