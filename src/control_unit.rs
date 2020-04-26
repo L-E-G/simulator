@@ -5,33 +5,37 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store};
+use crate::instructions::{Instruction,InstructionT,
+    MemoryOp,AddrMode,Load,Store,
+    ArithMode,ALUOp,Move,ArithI,Comp,
+    AS,LS,LogicType,ThreeOpLogic,Not,
+};
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
     /// Processor cycle counter.
-    cycle_count: u32,
+    pub cycle_count: u32,
     
     /// Holds computation registers.
-    registers: Registers,
+    pub registers: Registers,
 
     /// Memory system.
-    memory: DRAM,
+    pub memory: DRAM,
 
     /// Instruction which resulted from the fetch stage of the pipeline.
-    fetch_instruction: Option<u32>,
+    pub fetch_instruction: Option<u32>,
 
     /// Instruction currently in the decode stage of the pipeline.
-    decode_instruction: Option<Box<dyn Instruction>>,
+    pub decode_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the execute stage of the pipeline.
-    execute_instruction: Option<Box<dyn Instruction>>,
+    pub execute_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the access memory stage of the pipeline.
-    access_mem_instruction: Option<Box<dyn Instruction>>,
+    pub access_mem_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the write back stage of the pipeline.
-    write_back_instruction: Option<Box<dyn Instruction>>,
+    pub write_back_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
@@ -78,17 +82,23 @@ Instructions:
 
 impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new(dram_f: &str) -> ControlUnit {
+    pub fn new() -> ControlUnit {
         ControlUnit{
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100, dram_f),
+            memory: DRAM::new(100),
             fetch_instruction: None,            
             decode_instruction: None,
             execute_instruction: None,
             access_mem_instruction: None,
             write_back_instruction: None,
         }
+    }
+
+    /// Loads a memory file into the control unit's memory. See
+    /// DRAM::load_from_file() for details on the expected file structure.
+    pub fn load_memory_from_file(&mut self, f: &str) -> Result<(), String> {
+        self.memory.load_from_file(f)
     }
 
     /// Step through one cycle of the processor. Stores resulting state in self.
@@ -165,16 +175,105 @@ impl ControlUnit {
                                 Load::new(AddrMode::RegisterDirect))),
                             Some(MemoryOp::LoadI) => Ok(Box::new(
                                 Load::new(AddrMode::Immediate))),
-                            // TODO: Make Store instruction take AddrMode parameter
-                            // TODO: Make seperate branch for StoreRD & StoreI
                             Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new())),
+                                Store::new(AddrMode::RegisterDirect))),
+                            Some(MemoryOp::StoreI) => Ok(Box::new(
+                                Store::new(AddrMode::Immediate))),
                             _ => Err(format!("Invalid operation code {} for \
                                               mememory type instruction", iop)),
                         }
                     },
-                        _ => Err(format!("Invalid type value {} for instruction",
-                                         itype)),
+                    // Immediates:
+                    // Unsigned = false
+                    // Signed = true
+                    Some(InstructionT::ALU) => {
+                        let iop = fetch_inst.get_bits(7..=11) as u32;
+
+                        match ALUOp::match_val(iop) {    // Don't quite know how to add sign/unsign
+                            Some(ALUOp::Move) => Ok(Box::new(
+                                Move::new())),
+                            // ---- Add ----
+                            Some(ALUOp::AddUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                            Some(ALUOp::AddUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Add))),
+                            Some(ALUOp::AddSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                            Some(ALUOp::AddSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Add))),
+                            // ---- Sub ----
+                            Some(ALUOp::SubUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                            Some(ALUOp::SubUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Sub))),
+                            Some(ALUOp::SubSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                            Some(ALUOp::SubSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Sub))),
+                            // ---- Mul ----
+                            Some(ALUOp::MulUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                            Some(ALUOp::MulUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Mul))),
+                            Some(ALUOp::MulSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                            Some(ALUOp::MulSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Mul))),
+                            // ---- Div ----
+                            Some(ALUOp::DivUIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                            Some(ALUOp::DivUII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Div))),
+                            Some(ALUOp::DivSIRD) => Ok(Box::new(
+                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                            Some(ALUOp::DivSII) => Ok(Box::new(
+                                ArithI::new(AddrMode::Immediate, ArithMode::Div))),
+                            // ---- Comp ----
+                            Some(ALUOp::CompUI) => Ok(Box::new(
+                                Comp::new(false))),
+                            Some(ALUOp::CompSI) => Ok(Box::new(
+                                Comp::new(true))),
+                            // ---- Arithmetic Shift ----
+                            Some(ALUOp::ASLRD) => Ok(Box::new(
+                                AS::new(AddrMode::RegisterDirect, false))),
+                            Some(ALUOp::ASLI) => Ok(Box::new(
+                                AS::new(AddrMode::Immediate, false))),
+                            Some(ALUOp::ASRRD) => Ok(Box::new(
+                                AS::new(AddrMode::RegisterDirect, true))),
+                            Some(ALUOp::ASRI) => Ok(Box::new(
+                                AS::new(AddrMode::Immediate, true))),
+                            // ---- Logical Shift ----
+                            Some(ALUOp::LSLRD) => Ok(Box::new(
+                                LS::new(AddrMode::RegisterDirect, false))),
+                            Some(ALUOp::LSLI) => Ok(Box::new(
+                                LS::new(AddrMode::Immediate, false))),
+                            Some(ALUOp::LSRRD) => Ok(Box::new(
+                                LS::new(AddrMode::RegisterDirect, true))),
+                            Some(ALUOp::LSRI) => Ok(Box::new(
+                                LS::new(AddrMode::Immediate, true))),
+                            // ---- 3 Operation Logic ----
+                            Some(ALUOp::AndRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::And))),
+                            Some(ALUOp::AndI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::And))),
+                            Some(ALUOp::OrRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::Or))),
+                            Some(ALUOp::OrI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::Or))),
+                            Some(ALUOp::XorRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::Xor))),
+                            Some(ALUOp::XorI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::Xor))),
+                            // ---- Not ----
+                            Some(ALUOp::Not) => Ok(Box::new(
+                                Not::new())),
+                            
+                            _ => Err(format!("Invalid operation code {} for \
+                                ALU type instruction", iop)),
+                        }
+                    }
+                    _ => Err(format!("Invalid type value {} for instruction",
+                                        itype)),
                 };
 
                 // Run instruction specific decode
