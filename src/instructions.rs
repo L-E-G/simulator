@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC,STS};
+use crate::memory::{Memory,DRAM,Registers,PC,STS,LR};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -283,6 +283,48 @@ impl ALUOp {
     }
 }
 
+#[derive(PartialEq,Debug)]
+pub enum ControlOp {
+    JmpRD, JmpI,
+    JmpSRD, JmpSI,
+    Sih,
+    IntRD, IntI, 
+    Ijmp,
+}
+
+impl ControlOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            ControlOp::JmpRD => 0,
+            ControlOp::JmpI => 1,
+            ControlOp::JmpSRD => 2,
+            ControlOp::JmpSI => 3,
+            ControlOp::Sih => 4,
+            ControlOp::IntRD => 5,
+            ControlOp::IntI => 6,
+            ControlOp::Ijmp => 7,
+        }
+    }
+
+    /// Matches a value with a MemoryOp.
+    pub fn match_val(val: u32) -> Option<ControlOp> {
+        match val {
+            0 => Some(ControlOp::JmpRD),
+            1 => Some(ControlOp::JmpI),
+            2 => Some(ControlOp::JmpSRD),
+            3 => Some(ControlOp::JmpSI),
+            4 => Some(ControlOp::Sih),
+            5 => Some(ControlOp::IntRD),
+            6 => Some(ControlOp::IntI),
+            7 => Some(ControlOp::Ijmp),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------- Memory Instructions ----------------------------------
+
 /// Read a value from an address in memory and place it in a register.
 #[derive(Debug)]
 pub struct Load {
@@ -419,6 +461,8 @@ impl Instruction for Store {
         SimResult::Wait(0, ())
     }
 }
+
+// ---------------------------------- ALU Instructions ----------------------------------
 
 #[derive(Debug)]
 pub struct Move {
@@ -873,6 +917,77 @@ impl Instruction for Not {
     /// Store the value of the result in the destination register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         registers[self.dest] = !self.op;;
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+// ---------------------------------- Control Instructions ----------------------------------
+
+#[derive(Debug)]
+pub struct Jump {
+    mem_addr_mode: AddrMode,
+    is_sub: bool,
+    condition: u32,
+    addr: u32,
+}
+
+impl Jump {
+    // direction: Left = false, right = true
+    pub fn new(mem_addr_mode: AddrMode, is_sub: bool) -> Jump {
+        Jump{
+            mem_addr_mode: mem_addr_mode,
+            is_sub: is_sub,
+            condition: 0,
+            addr: 0,
+        }
+    }
+}
+
+impl Display for Jump {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Jump")
+    }
+}
+
+impl Instruction for Jump {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.condition = instruction.get_bits(0..=4) as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.addr = instruction.get_bits(10..=14) as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.addr = instruction.get_bits(10..=31) as u32;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        if self.condition == registers[STS] {
+            if self.is_sub {
+                registers[LR] = (PC + 1) as u32;
+            } 
+            else if self.mem_addr_mode == AddrMode::RegisterDirect {
+                registers[PC] = self.addr;
+            }
+            else if self.mem_addr_mode == AddrMode::Immediate {
+                registers[PC] += self.addr ;
+            }
+        }
+        
         
         return SimResult::Wait(0, ());
     }

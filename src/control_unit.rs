@@ -9,6 +9,7 @@ use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,
     ArithMode,ALUOp,Move,ArithI,Comp,
     AS,LS,LogicType,ThreeOpLogic,Not,
+    ControlOp,Jump,
 };
 
 /// Responsible for running instructions.
@@ -86,7 +87,7 @@ impl ControlUnit {
         ControlUnit{
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100),
+            memory: DRAM::new(100, "test-data/example-prog.bin"),
             fetch_instruction: None,            
             decode_instruction: None,
             execute_instruction: None,
@@ -183,11 +184,28 @@ impl ControlUnit {
                                               mememory type instruction", iop)),
                         }
                     },
+
+                    Some(InstructionT::Control) => {
+                        let iop = fetch_inst.get_bits(7..=9) as u32;
+                        match ControlOp::match_val(iop) {
+                            Some(ControlOp::JmpRD) => Ok(Box::new(
+                                Jump::new(AddrMode::RegisterDirect, false))),
+                            Some(ControlOp::JmpI) => Ok(Box::new(
+                                Jump::new(AddrMode::Immediate, false))),
+                            Some(ControlOp::JmpSRD) => Ok(Box::new(
+                                Jump::new(AddrMode::RegisterDirect, true))),
+                            Some(ControlOp::JmpSI) => Ok(Box::new(
+                                Jump::new(AddrMode::Immediate, true))),
+                            _ => Err(format!("Invalid operation code {} for \
+                                            Control type instruction", iop)),
+                        }
+                    }
+
                     // Immediates:
                     // Unsigned = false
                     // Signed = true
                     Some(InstructionT::ALU) => {
-                        let iop = fetch_inst.get_bits(7..=11) as u32;
+                        let iop = fetch_inst.get_bits(7..=12) as u32;
 
                         match ALUOp::match_val(iop) {    // Don't quite know how to add sign/unsign
                             Some(ALUOp::Move) => Ok(Box::new(

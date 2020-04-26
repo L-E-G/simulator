@@ -22,7 +22,7 @@ fn main() {
         Display::start();
     } else {
         // Run text interface
-        let mut cu = ControlUnit::new("test-data/example-prog.bin");
+        let mut cu = ControlUnit::new();
         let mut program_running = true;
 
         while program_running {
