@@ -29,7 +29,7 @@ jobs:
         wasm-pack build --release
         cd gui
         npm install
-        npm run build
+        npm run prod-build
         
     - name: Install SSH Client 🛰️
       uses: webfactory/ssh-agent@v0.2.0
