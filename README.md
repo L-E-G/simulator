@@ -70,14 +70,14 @@ First install its JavasScript dependencies:
 
 ```
 cd gui
-yarn install
+npm install
 ```
 
 Then start a web pack development server:
 
 ```
 cd gui
-yarn start
+npm start
 ```
 
 This server will serve the result on [localhost:3000](http://localhost:3000), 
