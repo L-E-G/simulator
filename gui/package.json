@@ -2,6 +2,7 @@
     "name": "gui",
     "version": "0.1.0",
     "private": true,
+    "homepage": "https://l-e-g.github.io/simulator/",
     "dependencies": {
         "bootstrap": "^4.4.1",
         "react": "^16.13.1",
