@@ -29,6 +29,10 @@ import Error from "./Error";
 const SimulatorContext = React.createContext(null);
 const ErrorContext = React.createContext([{}, () => {}]);
 
+const AppContainer = styled.div`
+margin-top: 5rem;
+`;
+
 const AppNavbar = styled(Navbar)`
 background: ${colors.primary};
 `;
@@ -111,14 +115,14 @@ align-items: center;
 
 const PC_REG_IDX = 28;
 
-const regAddrAliases = {
+var regAddrAliases = {
     26: "INTLR",
     27: "IHDLR",
-    PC_REG_IDX: "PC",
     29: "STATUS",
     30: "SP",
     31: "LR",
 };
+regAddrAliases[PC_REG_IDX] = "PC";
 
 const PROG_STATUS_COMPLETED = "Completed";
 const PROG_STATUS_NOT_RUNNING = "Not Running";
@@ -220,10 +224,10 @@ const App = () => {
     }
 
     return (
-	   <div>
+	   <AppContainer>
 		  <ErrorContext.Provider value={[error, setError]}>
 			 <SimulatorContext.Provider value={guiSimulator}>
-				<AppNavbar expand="md">
+				<AppNavbar expand="md" fixed="top">
 				    <Navbar.Brand>
 					   <BrandImg src={logoIcon} alt="LEG computer logo" />
 					   <BrandName>LEG Simulator</BrandName>
@@ -289,7 +293,7 @@ const App = () => {
 				</Container>
 			 </SimulatorContext.Provider>
 		  </ErrorContext.Provider>
-	   </div>
+	   </AppContainer>
     );
 };
 
