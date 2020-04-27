@@ -540,7 +540,7 @@ impl Instruction for Move {
 }
 
 #[derive(Debug)]
-pub struct ArithI {
+pub struct ArithSign {
     mem_addr_mode: AddrMode,
     dest: usize,
     operation: ArithMode,
@@ -549,9 +549,9 @@ pub struct ArithI {
     result: i32,
 }
 
-impl ArithI {
-    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> ArithI {
-        ArithI{
+impl ArithSign {
+    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> ArithSign {
+        ArithSign{
             mem_addr_mode: mem_addr_mode,
             operation: operation,
             dest: 0,
@@ -562,14 +562,14 @@ impl ArithI {
     }
 }
 
-impl Display for ArithI {
+impl Display for ArithSign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "ArithI")
+        write!(f, "Arithmetic instruction signed")
     }
 }
 
 /// The one instruction that takes care of all arithmetic instructions
-impl Instruction for ArithI {
+impl Instruction for ArithSign {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
         self.dest = instruction.get_bits(13..=17) as usize;
@@ -579,7 +579,75 @@ impl Instruction for ArithI {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.op2 = registers[instruction.get_bits(23..=27) as usize] as i32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.op2 = (((registers[PC] + 1) as i32) + (instruction.get_bits(23..=31) as i32)) as i32;
+            self.op2 = (instruction.get_bits(23..=31) as i32;
+        }
+        
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        match self.operation {
+            ArithMode::Add => self.result = self.op1 + self.op2,
+            ArithMode::Sub => self.result = self.op1 - self.op2,
+            ArithMode::Mul => self.result = self.op1 * self.op2,
+            ArithMode::Div => self.result = self.op1 / self.op2,
+        }
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result as u32;
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct ArithUnsign {
+    mem_addr_mode: AddrMode,
+    dest: usize,
+    operation: ArithMode,
+    op1: u32,
+    op2: u32,
+    result: u32,
+}
+
+impl ArithUnsign {
+    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> AriArithUnsignthI {
+        ArithUnsign{
+            mem_addr_mode: mem_addr_mode,
+            operation: operation,
+            dest: 0,
+            op1: 0,
+            op2: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for ArithUnsign {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Arithmetic instruction unsigned")
+    }
+}
+
+/// The one instruction that takes care of all arithmetic instructions
+impl Instruction for ArithUnsign {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.op2 = instruction.get_bits(23..=31) as u32;
         }
         
         return SimResult::Wait(0, ());

@@ -7,8 +7,8 @@ use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,
-    ArithMode,ALUOp,Move,ArithI,Comp,
-    AS,LS,LogicType,ThreeOpLogic,Not,
+    ArithMode,ALUOp,Move,ArithSign,ArithUnsign,
+    Comp,AS,LS,LogicType,ThreeOpLogic,Not,
     ControlOp,Jump,SIH,INT,JOOI,
 };
 
@@ -220,40 +220,40 @@ impl ControlUnit {
                                 Move::new())),
                             // ---- Add ----
                             Some(ALUOp::AddUIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Add))),
                             Some(ALUOp::AddUII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Add))),
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Add))),
                             Some(ALUOp::AddSIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Add))),
                             Some(ALUOp::AddSII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Add))),
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Add))),
                             // ---- Sub ----
                             Some(ALUOp::SubUIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Sub))),
                             Some(ALUOp::SubUII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Sub))),
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Sub))),
                             Some(ALUOp::SubSIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Sub))),
                             Some(ALUOp::SubSII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Sub))),
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Sub))),
                             // ---- Mul ----
                             Some(ALUOp::MulUIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Mul))),
                             Some(ALUOp::MulUII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Mul))),
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Mul))),
                             Some(ALUOp::MulSIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Mul))),
                             Some(ALUOp::MulSII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Mul))),
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Mul))),
                             // ---- Div ----
                             Some(ALUOp::DivUIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Div))),
                             Some(ALUOp::DivUII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Div))),
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Div))),
                             Some(ALUOp::DivSIRD) => Ok(Box::new(
-                                ArithI::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Div))),
                             Some(ALUOp::DivSII) => Ok(Box::new(
-                                ArithI::new(AddrMode::Immediate, ArithMode::Div))),
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Div))),
                             // ---- Comp ----
                             Some(ALUOp::CompUI) => Ok(Box::new(
                                 Comp::new(false))),
