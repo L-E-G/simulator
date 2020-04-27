@@ -26,7 +26,7 @@ jobs:
 
     - name: Build GUI 🛠️
       run: |
-        wasm-pack build
+        wasm-pack build --release
         cd gui
         npm install
         npm run build
@@ -41,4 +41,4 @@ jobs:
       with:
         SSH: true
         BRANCH: gh-pages
-        FOLDER: build
+        FOLDER: gui/build
