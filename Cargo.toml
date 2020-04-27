@@ -21,7 +21,6 @@ bit_field = "0.10.0"
 console_error_panic_hook = "0.1.6"
 serde = "^1.0.59"
 serde_derive = "^1.0.59"
-
-[dependencies.wasm-bindgen]
-version = "^0.2"
-features = ["serde-serialize"]
+js-sys = "0.3.37"
+wasm-bindgen = { version = "^0.2", features = ["serde-serialize"] }
+web-sys = { version = "0.3.37", features = [ "console" ] }

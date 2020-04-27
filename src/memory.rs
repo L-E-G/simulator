@@ -115,10 +115,10 @@ pub trait Memory<A, D> {
 pub trait InspectableMemory<A, D> {
     /// Returns a map of all a memory's contents. Where keys are addresses and
     /// values are memory values.
-    fn inspect(&self) -> Result<HashMap<A, D>, String>;
+    fn inspect(&self) -> HashMap<A, D>;
     
     /// Returns a text description of an address.
-    fn inspect_address_txt(&self, address: A) -> Result<String, String>;
+    fn inspect_address_txt(&self, address: A) -> String;
 }
 
 /// Simulates the slow DRAM memory.
@@ -189,16 +189,16 @@ impl DRAM {
 }
 
 impl InspectableMemory<u32, u32> for DRAM {
-    fn inspect(&self) -> Result<HashMap<u32, u32>, String> {
-        Ok(self.data.clone())
+    fn inspect(&self) -> HashMap<u32, u32> {
+        self.data.clone()
     }
     
-    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+    fn inspect_address_txt(&self, address: u32) -> String {
         match self.data.get(&address) {
-            Some(d) => Ok(format!("\
+            Some(d) => format!("\
 Address: {}
-Value  : {}", address, *d)),
-            None => Ok(format!("Does not exist")),
+Value  : {}", address, *d),
+            None => format!("Does not exist"),
         }
     }
 }
@@ -291,7 +291,7 @@ impl DMCache {
 }
 
 impl InspectableMemory<u32, u32> for DMCache {
-    fn inspect(&self) -> Result<HashMap<u32, u32>, String> {
+    fn inspect(&self) -> HashMap<u32, u32> {
         let mut map: HashMap<u32, u32> = HashMap::new();
 
         for i in 0..DM_CACHE_LINES {
@@ -302,21 +302,21 @@ impl InspectableMemory<u32, u32> for DMCache {
             map.insert(addr, line.data);
         }
 
-        Ok(map)
+        map
     }
         
-    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+    fn inspect_address_txt(&self, address: u32) -> String {
         let idx = self.get_address_index(address);
 
         let line = self.lines[idx];
 
-        Ok(format!("\
+        format!("\
 Index: {}
 Tag  : {}
 Data : {}
 Valid: {}
 Dirty: {}", idx,
-                   line.tag, line.data, line.valid, line.dirty))
+                   line.tag, line.data, line.valid, line.dirty)
     }
 }
 
@@ -463,6 +463,6 @@ mod tests {
             expected.insert(i as u32, 15 - (i as u32));
         }
 
-        assert_eq!(dram.inspect(), Ok(expected));
+        assert_eq!(dram.inspect(), expected);
     }
 }

@@ -1,9 +1,8 @@
-import React, { useState, useContext, useEffect } from "react";
+import React, { useState } from "react";
 
 import styled from "styled-components";
 
 import Navbar from "react-bootstrap/Navbar";
-import Button from "react-bootstrap/Button";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
@@ -51,39 +50,80 @@ width: 1.5rem;
 margin-right: 0.5rem;    
 `;
 
-const App = () => {
-    var simulator = new Simulator();
+const regAddrAliases = {
+    26: "INTLR",
+    27: "IHDLR",
+    28: "PC",
+    29: "STATUS",
+    30: "SP",
+    31: "LR",
+};
 
+/**
+ * Wraps Simulator class methods so that the React state is updated when the
+ * internal simulator state changes.
+ */
+class GUISimulator {
+    /**
+     * @param {Simulator} simulator - Base simulator instance
+	* @param {Object} stateSetters - React hook state setters, keys are: 
+	*     setRegisters, setDRAM, setPipeline.
+     */
+    constructor(simulator, stateSetters) {
+	   this.simulator = simulator;
+	   
+	   this.setRegisters = stateSetters.setRegisters;
+	   this.setDRAM = stateSetters.setDRAM;
+	   this.setPipeline = stateSetters.setPipeline;
+    }
+
+    set_registers(v) {
+	   this.simulator.set_registers(v);
+	   this.setRegisters(this.simulator.get_registers());
+    }
+    
+    set_dram(v) {
+	   this.simulator.set_dram(v);
+	   this.setDRAM(this.simulator.get_dram());
+    }
+
+    set_pipeline(v) {
+	   this.simulator.set_pipeline(v);
+	   this.setPipeline(this.simulator.get_pipeline());
+    }
+
+    step() {
+	   this.simulator.step();
+	   
+	   this.setRegisters(this.simulator.get_registers());
+	   this.setDRAM(this.simulator.get_dram());
+	   this.setPipeline(this.simulator.get_pipeline());
+    }
+}
+
+var simulator = new Simulator();
+
+const App = () => {
     const [registers, setRegisters] = useState(simulator.get_registers());
     const [dram, setDRAM] = useState(simulator.get_dram());
     const [pipeline, setPipeline] = useState(simulator.get_pipeline());
     const [error, setError] = useState(null);
-    
+
+    var guiSimulator = new GUISimulator(simulator, { setRegisters,setDRAM,
+										   setPipeline });
+
     const onStepClick = () => {
 	   try {
-		  simulator.step();
-
-		  setRegisters(simulator.get_registers());
-		  setDRAM(simulator.get_dram());
-		  setPipeline(simulator.get_pipeline());
+		  guiSimulator.step();
 	   } catch (e) {
 		  setError(e);
 	   }
     };
 
-    const regAddrAliases = {
-	   26: "INTLR",
-	   27: "IHDLR",
-	   28: "PC",
-	   29: "STATUS",
-	   30: "SP",
-	   31: "LR",
-    };
-    
     return (
 	   <div>
 		  <ErrorContext.Provider value={[error, setError]}>
-			 <SimulatorContext.Provider value={simulator}>
+			 <SimulatorContext.Provider value={guiSimulator}>
 				<AppNavbar expand="md">
 				    <Navbar.Brand>
 					   <BrandImg src={logoIcon} alt="LEG computer logo" />
@@ -102,7 +142,7 @@ const App = () => {
 
 				<Error />
 
-				<UploadMemFileForm setDRAM={setDRAM} />
+				<UploadMemFileForm />
 
 				<PipelineDisplay pipeline={pipeline} />
 

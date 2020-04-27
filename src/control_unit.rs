@@ -1,4 +1,5 @@
 use bit_field::BitField;
+use wasm_bindgen::prelude::*;
 
 use std::boxed::Box;
 use std::fmt;
@@ -160,28 +161,29 @@ impl ControlUnit {
                 // Figure out which instruction the bits represent by
                 // looking at the type and operation code.
                 let itype = fetch_inst.get_bits(5..=6) as u32;
-                
-                let icreate: Result<Box<dyn Instruction>, String> = 
+                let icreate: Result<Box<dyn Instruction>, String> =
+                // Match instruction type
                     match InstructionT::match_val(itype) {
-                    Some(InstructionT::Memory) => {
-                        let iop = fetch_inst.get_bits(7..=9) as u32;
+                        Some(InstructionT::Memory) => {
+                            let iop = fetch_inst.get_bits(7..=9) as u32;
 
-                        match MemoryOp::match_val(iop) {
-                            Some(MemoryOp::LoadRD) => Ok(Box::new(
-                                Load::new(AddrMode::RegisterDirect))),
-                            Some(MemoryOp::LoadI) => Ok(Box::new(
-                                Load::new(AddrMode::Immediate))),
-                            // TODO: Make Store instruction take AddrMode parameter
-                            // TODO: Make seperate branch for StoreRD & StoreI
-                            Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new())),
-                            _ => Err(format!("Invalid operation code {} for \
-                                              mememory type instruction", iop)),
-                        }
-                    },
+                            match MemoryOp::match_val(iop) {
+                                Some(MemoryOp::LoadRD) => Ok(Box::new(
+                                    Load::new(AddrMode::RegisterDirect))),
+                                Some(MemoryOp::LoadI) => Ok(Box::new(
+                                    Load::new(AddrMode::Immediate))),
+                                // TODO: Make Store instruction take AddrMode parameter
+                                // TODO: Make seperate branch for StoreRD & StoreI
+                                Some(MemoryOp::StoreRD) => Ok(Box::new(
+                                    Store::new())),
+                                _ => Err(format!("Invalid operation code {} for \
+                                                  mememory type instruction",
+                                                 iop)),
+                            }
+                        },
                         _ => Err(format!("Invalid type value {} for instruction",
                                          itype)),
-                };
+                    };
 
                 // Run instruction specific decode
                 self.decode_instruction = match icreate {

@@ -16,6 +16,7 @@ min-height: 87px;
 transform: translateX(75%);
 margin-top: 1.5rem;
 margin-bottom: 1.5rem;
+background: white;
 `;
 
 const ErrorImg = styled.img`

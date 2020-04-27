@@ -5,9 +5,18 @@ import styled from "styled-components";
 import checkedIcon from "../images/checked.png";
 import uncheckedIcon from "../images/unchecked.png";
 
+const CheckContainer = styled.div`
+display: flex;
+cursor: pointer;
+`;
+
 const CheckImg = styled.img`
 width: 1.5rem;
+height: 1.5rem;
 margin-right: 1rem;
+flex-grow: 0;
+flex-shrink: 0;
+align-self: center;
 `;
 
 const CheckInput = (props) => {
@@ -18,10 +27,10 @@ const CheckInput = (props) => {
     const imgSrc = value === true ? checkedIcon : uncheckedIcon;
 
     return (
-	   <div onClick={onClick}>
+	   <CheckContainer className={props.className} onClick={onClick}>
 		  <CheckImg src={imgSrc} />
-		  {label}
-	   </div>
+		  <span>{label}</span>
+	   </CheckContainer>
     );
 };
 

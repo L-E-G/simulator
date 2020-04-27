@@ -4,7 +4,6 @@ import styled from "styled-components";
 
 import Table from "react-bootstrap/Table";
 import Nav from "react-bootstrap/Nav";
-import ButtonGroup from "react-bootstrap/ButtonGroup";
 import Form from "react-bootstrap/Form";
 import Dropdown from "react-bootstrap/Dropdown";
 
@@ -12,7 +11,7 @@ import settingsIcon from "../images/settings.png";
 
 import ToggleExpandButton from "./ToggleExpandButton.jsx";
 import { colors } from "../styles";
-import { OutlinedButton, Badge, DropdownToggle } from "./styled";
+import { Badge, DropdownToggle } from "./styled";
 import CheckInput from "./CheckInput";
 
 const MemToggleExpandButton = styled(ToggleExpandButton)`
@@ -137,7 +136,7 @@ const MemoryTable = (props) => {
 	   setFormat(e.target.innerText);
     };
 
-    // Table rows
+    // Filter table rows based on search input
     var filteredMemory = [];
 
     for (var key in memory) {
@@ -149,16 +148,22 @@ const MemoryTable = (props) => {
 		  value: valueStr,
 	   };
 
-	   if (searchAddrs) {
-		  if (searchFuzzy && keyStr.indexOf(search) !== -1) {
+	   if (searchAddrs === true) {
+		  if (searchFuzzy === true && keyStr.indexOf(search.toLocaleLowerCase()) !== -1) {
 			 filteredMemory.push(item);
-		  } else if (!searchFuzzy && keyStr === search) {
+		  } else if (searchFuzzy === false && keyStr === search) {
+			 filteredMemory.push(item);
+		  } else if (searchFuzzy === true && key in keyAliases &&
+				   keyAliases[key].toLocaleLowerCase().indexOf(search.toLocaleLowerCase()) !== -1) {
+			 filteredMemory.push(item);
+		  } else if (searchFuzzy === false && key in keyAliases &&
+				   keyAliases[key] === search) {
 			 filteredMemory.push(item);
 		  }
-	   } else if (searchVals) {
-		  if (searchFuzzy && valueStr.indexOf(search) !== -1) {
+	   } else if (searchVals === true) {
+		  if (searchFuzzy === true && valueStr.indexOf(search) !== -1) {
 			 filteredMemory.push(item);
-		  } else if (!searchFuzzy && valueStr === search) {
+		  } else if (searchFuzzy === false && valueStr === search) {
 			 filteredMemory.push(item);
 		  }
 	   }
@@ -281,7 +286,9 @@ const MemoryTable = (props) => {
 						  <ValueHeaderLabel>{valueHeader}</ValueHeaderLabel>
 						  <FormatSettingsDropdown>
 							 <DropdownToggle>
-								<img src={settingsIcon} />
+								<img
+								    alt="Value display settings"
+								    src={settingsIcon} />
 							 </DropdownToggle>
 
 							 <Dropdown.Menu onClick={onFormatClick}>
@@ -303,8 +310,8 @@ const MemoryTable = (props) => {
 			 <tbody>
 				{Object.keys(filteredMemory).map((i) => {
 				    let addr = filteredMemory[i].address;
-				    let key = addr + (i in keyAliases ?
-								  " (" + keyAliases[i] + ")" : "");
+				    let key = addr + (addr in keyAliases ?
+								  " (" + keyAliases[addr] + ")" : "");
 				    let value = filteredMemory[i].value;
 				    
 				    return (

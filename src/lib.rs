@@ -2,6 +2,8 @@ use wasm_bindgen::prelude::*;
 use wasm_bindgen::convert::{IntoWasmAbi,FromWasmAbi,WasmSlice};
 use wasm_bindgen::JsValue;
 use console_error_panic_hook;
+use js_sys;
+use web_sys::console;
 
 #[macro_use]
 extern crate serde_derive;
@@ -16,12 +18,6 @@ mod control_unit;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
 use crate::memory::{Memory,InspectableMemory};
-
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(js_namespace = console)]
-    fn log(s: &str);
-}
 
 /// Represents the state of stages in the pipeline.
 /// Values are names of the instruction in each stage.
@@ -43,7 +39,7 @@ pub struct Simulator {
 
 #[wasm_bindgen]
 impl Simulator {
-    /// Initializes simulator.
+    /// Initializes simulator
     #[wasm_bindgen(constructor)]
     pub fn new() -> Simulator {
         // Setup panic logging hook
@@ -57,16 +53,8 @@ impl Simulator {
     /// Returns addresses and values in DRAM. First returned value is a list of
     /// addresses. Second returned value is a list of values corresponding to
     /// the addresses.
-    pub fn get_dram(&self) -> Result<JsValue, JsValue> {
-        match self.control_unit.memory.inspect() {
-            Err(e) => {
-                Err(JsValue::from_serde(
-                    &format!("failed to inspect DRAM: {}", e)).unwrap())
-            },
-            Ok(addresses) => {
-                Ok(JsValue::from_serde(&addresses).unwrap())
-            },
-        }
+    pub fn get_dram(&self) -> JsValue {
+        JsValue::from_serde(&self.control_unit.memory.inspect()).unwrap()
     }
 
     /// Sets the contents of DRAM based on binary input.

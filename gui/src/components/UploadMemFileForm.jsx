@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState, useContext, useEffect } from "react";
 
 import styled from "styled-components";
 
@@ -8,6 +8,7 @@ import Spinner from "react-bootstrap/Spinner";
 
 import { SimulatorContext, ErrorContext } from "./App.jsx";
 import ToggleExpandButton from "./ToggleExpandButton.jsx";
+import CheckInput from "./CheckInput";
 
 import { colors } from "../styles";
 
@@ -22,11 +23,6 @@ float: right;
 
 const UploadCardTitle = styled(Card.Title)`
 margin-bottom: 0;
-`;
-
-const inputHeight = "2.3rem";
-const UploadForm = styled(Form)`
-height: ${inputHeight};
 `;
 
 const UploadFileInput = styled(Form.File)`
@@ -56,6 +52,13 @@ const ReuploadFileInput = styled(UploadFileInput)`
 }
 `;
 
+const LoadSameFileCheck = styled(CheckInput)`
+margin-top: 1rem;
+`;
+
+const SHOULD_USE_MEM_FILE_KEY = "shouldUseMemoryFile";
+const STORED_MEM_FILE_KEY = "memoryFile";
+
 const UploadMemFileForm = (props) => {
     const simulator = useContext(SimulatorContext);
     const setError = useContext(ErrorContext)[1];
@@ -63,6 +66,33 @@ const UploadMemFileForm = (props) => {
     const [expanded, setExpanded] = useState(true);
     const [fileLoading, setFileLoading] = useState(false);
     const [fileSelected, setFileSelected] = useState(false);
+    const [useSameFile, setUseSameFile] = useState(
+	   localStorage.getItem(SHOULD_USE_MEM_FILE_KEY) === "true");
+    const [useSameFileCheck, setUseSameFileCheck] = useState(useSameFile);
+
+    useEffect(() => {
+	   // Load DRAM if use same file option is set
+	   if (useSameFile === true && fileSelected === false) {
+		  let storedMemFileItem = localStorage.getItem(STORED_MEM_FILE_KEY);
+
+		  if (storedMemFileItem !== null) {
+			 try {
+				var arr = [];
+				let split = storedMemFileItem.split(",");
+				for (var i in split) {
+				    arr.push(Number(split[i]));
+				}
+
+				simulator.set_dram(new Uint8Array(arr));
+				
+				setExpanded(false);
+				setFileSelected(true);
+			 } catch (e) {
+				setError(e);
+			 }
+		  }
+	   }
+    }, [fileSelected, setError, simulator, useSameFile]);
     
     var reader = new FileReader();
 
@@ -70,7 +100,10 @@ const UploadMemFileForm = (props) => {
 	   try {
 		  var array = new Uint8Array(reader.result);
 		  simulator.set_dram(array);
-		  props.setDRAM(simulator.get_dram());
+
+		  if (useSameFile === true) {
+			 localStorage.setItem(STORED_MEM_FILE_KEY, array);
+		  }
 
 		  setFileLoading(false);
 		  setExpanded(false);
@@ -84,9 +117,22 @@ const UploadMemFileForm = (props) => {
     const onFileChange = (e) => {
 	   setFileSelected(true);
 	   setFileLoading(true);
+	   setUseSameFile(useSameFileCheck);
 	   
 	   reader.readAsArrayBuffer(e.target.files[0]);
     };
+
+    const onUseSameFileChange = () => {
+	   localStorage.setItem(SHOULD_USE_MEM_FILE_KEY, !useSameFileCheck);
+	   setUseSameFileCheck(!useSameFileCheck);
+    };
+
+    const LoadSameFileCheckEl = (
+	   <LoadSameFileCheck
+	   value={useSameFileCheck}
+	   onClick={onUseSameFileChange}
+	   label="Load the same file in the future" />
+    );
 
     const FormContents = () => {
 	   if (!fileSelected) {
@@ -96,6 +142,8 @@ const UploadMemFileForm = (props) => {
 				    label="Select File"
 				    onChange={onFileChange}
 				    custom />
+
+				{LoadSameFileCheckEl}
 			 </div>
 		  );
 	   } else {
@@ -113,6 +161,8 @@ const UploadMemFileForm = (props) => {
 					   label="Load Another"
 					   onChange={onFileChange}
 				        custom />
+
+				    {LoadSameFileCheckEl}
 				</div>
 			 );
 		  }
@@ -140,9 +190,9 @@ const UploadMemFileForm = (props) => {
 					   Upload a file to set the contents of simulator memory.
 				    </Card.Body>
 				    
-				    <UploadForm>
+				    <form>
 					   <FormContents />
-				    </UploadForm>
+				    </form>
 				</div>
 			 }
 		  </Card.Body>
