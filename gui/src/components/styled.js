@@ -6,12 +6,19 @@ import Dropdown from "react-bootstrap/Dropdown";
 
 import { colors } from "../styles";
 
+const Color = require("color");
+
 const SecondaryButton = styled(Button)`
 background: ${colors.secondary};
 
 &.active, &:hover {
     background: white;
     color: ${colors.primary};
+}
+
+&:disabled {
+    background: ${Color(colors.secondary).darken(0.5)};
+    border: 1px solid ${Color(colors.secondary).darken(0.3)};
 }
 `;
 

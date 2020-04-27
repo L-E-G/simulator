@@ -107,6 +107,11 @@ impl Simulator {
         JsValue::from_serde(&status).unwrap()
     }
 
+    /// Returns the control unit cycle count.
+    pub fn get_cycle_count(&self) -> u32 {
+        self.control_unit.cycle_count
+    }
+
     /// Step through one cycle of processor.
     /// See return value of ControlUnit::step() for details on this methods
     /// return value.
