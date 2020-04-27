@@ -11,14 +11,13 @@ jobs:
     - name: Checkout Branch 📥
       uses: actions/checkout@v2
 
-    - name: Install Dependencies 📦
-      run: |
-        sudo apt-get update
-        sudo apt-get install -f
-        sudo apt-get install -y nodejs npm
-      
     - name: Run Tests 🧪
       run: cargo test --verbose
+
+    - name: Use Node.js 📦
+      uses: actions/setup-node@v1
+      with:
+        node-version: '13.x'
 
     - name: Build GUI 🛠️
       run: |
