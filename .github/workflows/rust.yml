@@ -21,7 +21,7 @@ jobs:
     - name: Install GUI Build Dependencies 📦
       run: |
         sudo apt-get update
-        sudo apt-get install -y curl
+        sudo apt-get install -y curl rsync
         curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
 
     - name: Build GUI 🛠️
