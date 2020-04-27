@@ -8,8 +8,31 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v2
-    - name: Build
-      run: cargo build --verbose
-    - name: Run tests
+    - name: Checkout Branch 📥
+      uses: actions/checkout@v2
+
+    - name: Install Dependencies 📦
+      run: |
+        apt-get update
+        apt-get install -y nodejs npm
+      
+    - name: Run Tests 🧪
       run: cargo test --verbose
+
+    - name: Build GUI 🛠️
+      run: |
+        cd gui
+        npm install
+        npm run build
+        
+    - name: Install SSH Client 🛰️
+      uses: webfactory/ssh-agent@v0.2.0
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+      
+    - name: Deploy 🚀
+      uses: JamesIves/github-pages-deploy-action@releases/v3
+      with:
+        SSH: true
+        BRANCH: gh-pages
+        FOLDER: build
