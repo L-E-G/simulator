@@ -1064,10 +1064,8 @@ impl Instruction for INT {
             self.code = instruction.get_bits(10..=13) as u32;
         }
 
-        if registers[STS] != InterruptCodes::NOT_SET as u32 {
-            if registers[IHDLR] != InterruptCodes::NOT_SET_INITIAL as u32 {
-                self.proceed = true;
-            }
+        if registers[STS] != InterruptCodes::NOT_SET as u32 && registers[IHDLR] != InterruptCodes::NOT_SET_INITIAL as u32 {
+            self.proceed = true;
         }
 
         return SimResult::Wait(0, ());
@@ -1100,6 +1098,45 @@ impl Instruction for INT {
             registers[PC] = registers[IHDLR];
         }
 
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct JOOI {}
+
+impl JOOI {
+    pub fn new() -> JOOI {
+        JOOI{}
+    }
+}
+
+impl Display for JOOI {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Jump out of Interrupt")
+    }
+}
+
+impl Instruction for JOOI {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        if registers[STS] != InterruptCodes::NOT_SET_INITIAL as u32 {
+            registers[STS] = InterruptCodes::NOT_SET as u32;
+            registers[PC] = registers[INTLR];
+        }
+        
         return SimResult::Wait(0, ());
     }
 }
