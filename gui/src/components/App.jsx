@@ -109,10 +109,12 @@ align-items: center;
 }
 `;
 
+const PC_REG_IDX = 28;
+
 const regAddrAliases = {
     26: "INTLR",
     27: "IHDLR",
-    28: "PC",
+    PC_REG_IDX: "PC",
     29: "STATUS",
     30: "SP",
     31: "LR",
@@ -237,7 +239,7 @@ const App = () => {
 							 </SimulatorStatusBadge>
 							 
 							 <SimulatorStatusBadge>
-								<b>Program Counter</b>: {registers[28]}
+								<b>Program Counter</b>: {registers[PC_REG_IDX]}
 							 </SimulatorStatusBadge>
 							 
 							 <SimulatorStatusBadge>
