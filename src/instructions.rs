@@ -1,13 +1,14 @@
 use bit_field::BitField;
 
-use std::fmt::Debug;
+use std::fmt;
+use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
-pub trait Instruction: Debug {
+pub trait Instruction: Display + Debug {
     /// Extracts parameters from instruction bits and stores them in the
     /// implementing struct for use by future stages. It also retrieves register
     /// values if necessary and does the same.
@@ -17,7 +18,7 @@ pub trait Instruction: Debug {
     fn execute(&mut self) -> SimResult<(), String>;
 
     /// Accesses memory.
-    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String>;
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String>;
 
     /// Write results to registers.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String>;
@@ -33,6 +34,12 @@ impl Noop {
     }
 }
 
+impl Display for Noop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Noop")
+    }
+}
+
 impl Instruction for Noop {
     fn decode(&mut self, _instruction: u32, _registers: &Registers) -> SimResult<(), String> {
         SimResult::Wait(0, ())
@@ -42,7 +49,7 @@ impl Instruction for Noop {
         SimResult::Wait(0, ())
     }
 
-    fn access_memory(&mut self, _memory: &mut DRAM) -> SimResult<(), String> {
+    fn access_memory(&mut self, _memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         SimResult::Wait(0, ())
     }
 
@@ -91,6 +98,15 @@ pub enum AddrMode {
 
     /// Value is the operand.
     Immediate,
+}
+
+impl Display for AddrMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            AddrMode::RegisterDirect => write!(f, "RD"),
+            AddrMode::Immediate => write!(f, "I"),
+        }
+    }
 }
 
 /// Identifies memory operations.
@@ -145,6 +161,12 @@ pub struct Load {
     value: u32,
 }
 
+impl Display for Load {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Load ({})", self.mem_addr_mode)
+    }
+}
+
 impl Load {
     /// Creates an empty load instruction.
     pub fn new(mem_addr_mode: AddrMode) -> Load {
@@ -177,7 +199,7 @@ impl Instruction for Load {
     }
 
     /// Load value at mem_addr from memory into value.
-    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         match memory.get(self.mem_addr) {
             SimResult::Err(e) => SimResult::Err(
                 format!("failed to retrieve memory address {}: {}",
@@ -216,6 +238,12 @@ impl Store {
     }
 }
 
+impl Display for Store {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Store")
+    }
+}
+
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
@@ -231,7 +259,7 @@ impl Instruction for Store {
     }
 
     /// Set address in memory to value.
-    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         println!("set({}, {}", self.dest_addr, self.value);
         match memory.set(self.dest_addr, self.value) {
             SimResult::Err(e) => SimResult::Err(
@@ -293,7 +321,7 @@ impl Instruction for Move {
     }
 
     /// Skip, no memory accessing.
-    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -372,7 +400,7 @@ impl Instruction for AddUIImm {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut DRAM) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -394,7 +422,6 @@ mod tests {
     fn test_load_instruction() {
         let scenario = Scenario::new();
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
-        let memory_ref = Rc::new(RefCell::new(memory));
         let mut regs = Registers::new();
         
         // Setup registers
@@ -449,7 +476,7 @@ mod tests {
         // Test access memory
         scenario.expect(memory_handle.get(ADDR_VAL)
                         .and_return(SimResult::Wait(MEM_DELAY, MEM_VALUE)));
-        assert_eq!(load_instruction.access_memory(memory_ref),
+        assert_eq!(load_instruction.access_memory(&mut memory),
                    SimResult::Wait(MEM_DELAY, ()), "access_memory() == expected");
         assert_eq!(load_instruction.value, MEM_VALUE,
                    ".value == expected");
@@ -470,7 +497,6 @@ mod tests {
         let scenario = Scenario::new();
 
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
-        let memory_ref = Rc::new(RefCell::new(memory));
         
         let mut regs = Registers::new();
         let mut store_instruction = Store::new();
@@ -504,7 +530,7 @@ mod tests {
         const MEM_DELAY: u16 = 45;
         scenario.expect(memory_handle.set(DEST_ADDR, SRC_VAL)
                         .and_return(SimResult::Wait(MEM_DELAY, ())));
-        assert_eq!(store_instruction.access_memory(memory_ref),
+        assert_eq!(store_instruction.access_memory(&mut memory),
                    SimResult::Wait(MEM_DELAY, ()));
 
         // Test write back

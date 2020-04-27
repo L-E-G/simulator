@@ -25,7 +25,7 @@ const REGISTERS_SIZE: usize = 32;
 #[derive(Clone,Debug,PartialEq)]
 pub struct Registers {
     /// Holds register values
-    file: [u32; REGISTERS_SIZE],
+    pub file: [u32; REGISTERS_SIZE],
 }
 
 /// Interupt link register index
@@ -115,10 +115,10 @@ pub trait Memory<A, D> {
 pub trait InspectableMemory<A, D> {
     /// Returns a map of all a memory's contents. Where keys are addresses and
     /// values are memory values.
-    fn inspect(&self) -> Result<HashMap<A, D>, String>;
+    fn inspect(&self) -> HashMap<A, D>;
     
     /// Returns a text description of an address.
-    fn inspect_address_txt(&self, address: A) -> Result<String, String>;
+    fn inspect_address_txt(&self, address: A) -> String;
 }
 
 /// Simulates the slow DRAM memory.
@@ -128,20 +128,17 @@ pub struct DRAM {
 }
 
 impl DRAM {
-    pub fn new(delay: u16, dram_f: &str) -> DRAM {
-        let mut d = DRAM{
+    /// Creates a new DRAM structure.
+    pub fn new(delay: u16) -> DRAM {
+        DRAM{
             delay: delay,
             data: HashMap::new(),
-        };
-
-        d.load_from_file(dram_f);
-
-        d
+        }
     }
 
     /// Loads contents of a file into DRAM.
-    /// The file should be a binary file. Every 32 bits will be loaded in as a word
-    /// in memory. The address in memory will increment by 1 for word loaded.
+    /// See load_from_reader() for details about the required format of
+    /// this file.
     pub fn load_from_file(&mut self, file_p: &str) -> Result<(), String> {
         // Read file
         let file = match File::open(file_p) {
@@ -152,8 +149,15 @@ impl DRAM {
             },
         };
 
-        let mut reader = BufReader::new(file);
+        // Load
+        self.load_from_reader(file)
+    }
 
+    /// Loads contents of a reader into DRAM.
+    /// The buffer should be binary. Every 32 bits will be loaded in as a word
+    /// in memory. The address in memory will increment by 1 for word loaded.
+    pub fn load_from_reader(&mut self, src: impl Read) -> Result<(), String> {
+        let mut reader = BufReader::new(src);
         let mut addr: u32 = 0;
         let mut buf: [u8; 4] = [0; 4];
 
@@ -163,9 +167,9 @@ impl DRAM {
                     if bytes_read == 0 { // End of file
                         return Ok(());
                     } else if bytes_read != 4 { // Incorrect number of bytes read
-                        return Err(format!("Read {} bytes from DRAM file \"{}\" \
-                                            but expected 4 bytes",
-                                           bytes_read, file_p));
+                        return Err(format!("Read {} bytes from buffer but \
+                                            expected 4 bytes",
+                                           bytes_read));
                     }
 
                     let value: u32 = (buf[3] as u32) |
@@ -177,8 +181,7 @@ impl DRAM {
                     addr += 1;
                 },
                 Err(e) => {
-                    return Err(format!("Failed to read DRAM file \"{}\": {}",
-                                       file_p, e));
+                    return Err(format!("Failed to read buffer: {}", e));
                 },
             }
         }
@@ -186,16 +189,16 @@ impl DRAM {
 }
 
 impl InspectableMemory<u32, u32> for DRAM {
-    fn inspect(&self) -> Result<HashMap<u32, u32>, String> {
-        Ok(self.data.clone())
+    fn inspect(&self) -> HashMap<u32, u32> {
+        self.data.clone()
     }
     
-    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+    fn inspect_address_txt(&self, address: u32) -> String {
         match self.data.get(&address) {
-            Some(d) => Ok(format!("\
+            Some(d) => format!("\
 Address: {}
-Value  : {}", address, *d)),
-            None => Ok(format!("Does not exist")),
+Value  : {}", address, *d),
+            None => format!("Does not exist"),
         }
     }
 }
@@ -288,7 +291,7 @@ impl DMCache {
 }
 
 impl InspectableMemory<u32, u32> for DMCache {
-    fn inspect(&self) -> Result<HashMap<u32, u32>, String> {
+    fn inspect(&self) -> HashMap<u32, u32> {
         let mut map: HashMap<u32, u32> = HashMap::new();
 
         for i in 0..DM_CACHE_LINES {
@@ -299,21 +302,21 @@ impl InspectableMemory<u32, u32> for DMCache {
             map.insert(addr, line.data);
         }
 
-        Ok(map)
+        map
     }
         
-    fn inspect_address_txt(&self, address: u32) -> Result<String, String> {
+    fn inspect_address_txt(&self, address: u32) -> String {
         let idx = self.get_address_index(address);
 
         let line = self.lines[idx];
 
-        Ok(format!("\
+        format!("\
 Index: {}
 Tag  : {}
 Data : {}
 Valid: {}
 Dirty: {}", idx,
-                   line.tag, line.data, line.valid, line.dirty))
+                   line.tag, line.data, line.valid, line.dirty)
     }
 }
 
@@ -460,6 +463,6 @@ mod tests {
             expected.insert(i as u32, 15 - (i as u32));
         }
 
-        assert_eq!(dram.inspect(), Ok(expected));
+        assert_eq!(dram.inspect(), expected);
     }
 }

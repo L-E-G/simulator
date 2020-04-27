@@ -4,17 +4,23 @@ version = "0.1.0"
 authors = ["Noah Huppert <contact@noahh.io>"]
 edition = "2018"
 
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+[lib]
+name = "simulator"
+crate-type = ["rlib", "cdylib"]
+path = "src/lib.rs"
+
+[[bin]]
+name = "simulator"
+path = "src/bin.rs"
 
 [dependencies]
 text_io = "0.1.8"
 mockers = "0.21.0"
 mockers_derive = "0.21.0"
 bit_field = "0.10.0"
-iced = "0.1"
-iced_native = "0.2"
-iced_core = "0.2"
-iced_web = "0.2"
-iced_wgpu = "0.2"
-iced_winit = "0.1"
-iced_futures = "0.1.0"
+console_error_panic_hook = "0.1.6"
+serde = "^1.0.59"
+serde_derive = "^1.0.59"
+js-sys = "0.3.37"
+wasm-bindgen = { version = "^0.2", features = ["serde-serialize"] }
+web-sys = { version = "0.3.37", features = [ "console" ] }

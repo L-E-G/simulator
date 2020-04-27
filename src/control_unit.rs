@@ -1,4 +1,5 @@
 use bit_field::BitField;
+use wasm_bindgen::prelude::*;
 
 use std::boxed::Box;
 use std::fmt;
@@ -10,28 +11,28 @@ use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store}
 /// Responsible for running instructions.
 pub struct ControlUnit {
     /// Processor cycle counter.
-    cycle_count: u32,
+    pub cycle_count: u32,
     
     /// Holds computation registers.
-    registers: Registers,
+    pub registers: Registers,
 
     /// Memory system.
-    memory: DRAM,
+    pub memory: DRAM,
 
     /// Instruction which resulted from the fetch stage of the pipeline.
-    fetch_instruction: Option<u32>,
+    pub fetch_instruction: Option<u32>,
 
     /// Instruction currently in the decode stage of the pipeline.
-    decode_instruction: Option<Box<dyn Instruction>>,
+    pub decode_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the execute stage of the pipeline.
-    execute_instruction: Option<Box<dyn Instruction>>,
+    pub execute_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the access memory stage of the pipeline.
-    access_mem_instruction: Option<Box<dyn Instruction>>,
+    pub access_mem_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction currently in the write back stage of the pipeline.
-    write_back_instruction: Option<Box<dyn Instruction>>,
+    pub write_back_instruction: Option<Box<dyn Instruction>>,
 }
 
 /// Prepends 4 spaces to every line.
@@ -78,17 +79,23 @@ Instructions:
 
 impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new(dram_f: &str) -> ControlUnit {
+    pub fn new() -> ControlUnit {
         ControlUnit{
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100, dram_f),
+            memory: DRAM::new(100),
             fetch_instruction: None,            
             decode_instruction: None,
             execute_instruction: None,
             access_mem_instruction: None,
             write_back_instruction: None,
         }
+    }
+
+    /// Loads a memory file into the control unit's memory. See
+    /// DRAM::load_from_file() for details on the expected file structure.
+    pub fn load_memory_from_file(&mut self, f: &str) -> Result<(), String> {
+        self.memory.load_from_file(f)
     }
 
     /// Step through one cycle of the processor. Stores resulting state in self.
@@ -154,28 +161,29 @@ impl ControlUnit {
                 // Figure out which instruction the bits represent by
                 // looking at the type and operation code.
                 let itype = fetch_inst.get_bits(5..=6) as u32;
-                
-                let icreate: Result<Box<dyn Instruction>, String> = 
+                let icreate: Result<Box<dyn Instruction>, String> =
+                // Match instruction type
                     match InstructionT::match_val(itype) {
-                    Some(InstructionT::Memory) => {
-                        let iop = fetch_inst.get_bits(7..=9) as u32;
+                        Some(InstructionT::Memory) => {
+                            let iop = fetch_inst.get_bits(7..=9) as u32;
 
-                        match MemoryOp::match_val(iop) {
-                            Some(MemoryOp::LoadRD) => Ok(Box::new(
-                                Load::new(AddrMode::RegisterDirect))),
-                            Some(MemoryOp::LoadI) => Ok(Box::new(
-                                Load::new(AddrMode::Immediate))),
-                            // TODO: Make Store instruction take AddrMode parameter
-                            // TODO: Make seperate branch for StoreRD & StoreI
-                            Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                Store::new())),
-                            _ => Err(format!("Invalid operation code {} for \
-                                              mememory type instruction", iop)),
-                        }
-                    },
+                            match MemoryOp::match_val(iop) {
+                                Some(MemoryOp::LoadRD) => Ok(Box::new(
+                                    Load::new(AddrMode::RegisterDirect))),
+                                Some(MemoryOp::LoadI) => Ok(Box::new(
+                                    Load::new(AddrMode::Immediate))),
+                                // TODO: Make Store instruction take AddrMode parameter
+                                // TODO: Make seperate branch for StoreRD & StoreI
+                                Some(MemoryOp::StoreRD) => Ok(Box::new(
+                                    Store::new())),
+                                _ => Err(format!("Invalid operation code {} for \
+                                                  mememory type instruction",
+                                                 iop)),
+                            }
+                        },
                         _ => Err(format!("Invalid type value {} for instruction",
                                          itype)),
-                };
+                    };
 
                 // Run instruction specific decode
                 self.decode_instruction = match icreate {
