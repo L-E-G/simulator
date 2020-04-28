@@ -12,7 +12,7 @@ margin-left: 1rem;
 margin-right: 1rem;
 `;
 
-const CurrentCycleOnlyCheckInput = styled(CheckInput)`
+const CurrentRecentOnlyCheckInput = styled(CheckInput)`
 margin-top: 1rem;
 margin-bottom: 1rem;
 `;
@@ -21,36 +21,38 @@ const NoPipelineBadgeContainer = styled.div`
 text-align: center;
 `;
 
-const CURRENT_CYCLE_ONLY_KEY = "pipelineCurrentCycleOnly";
+const RECENT_ONLY_KEY = "pipelineRecentOnly";
 
 const PipelineDisplay = (props) => {
-    const [currentCycleOnly, setCurrentCycleOnly] = useState(
-	   localStorage.getItem(CURRENT_CYCLE_ONLY_KEY) === "true");
+    let storedCurrentRecentOnly = localStorage.getItem(RECENT_ONLY_KEY) ||
+						   "true";
+    const [recentOnly, setRecentOnly] = useState(
+	   storedCurrentRecentOnly === "true");
 
     var pipelines = props.pipelines;
 
-    if (currentCycleOnly === true && props.pipelines.length > 0) {
+    if (recentOnly === true && props.pipelines.length > 0) {
 	   pipelines = [props.pipelines[0]];
     }
 
-    const onCurrentCycleOnlyChange = () => {
-	   localStorage.setItem(CURRENT_CYCLE_ONLY_KEY, !currentCycleOnly);
-	   setCurrentCycleOnly(!currentCycleOnly);
+    const onCurrentRecentOnlyChange = () => {
+	   localStorage.setItem(RECENT_ONLY_KEY, !recentOnly);
+	   setRecentOnly(!recentOnly);
     };
 
     return (
 	   <PipelineDiv>
 		  <h3>Pipeline</h3>
 
-		  <CurrentCycleOnlyCheckInput
-			 value={currentCycleOnly}
-			 onClick={onCurrentCycleOnlyChange}
-			 label="Only Show Current Cycle" />
+		  <CurrentRecentOnlyCheckInput
+			 value={recentOnly}
+			 onClick={onCurrentRecentOnlyChange}
+			 label="Only Show Most Recent" />
 
 		  <Table bordered>
 			 <thead>
 				<tr>
-				    <th>Cycle #</th>
+				    <th>Step #</th>
 				    <th>Fetch</th>
 				    <th>Decode</th>
 				    <th>Execute</th>
@@ -61,7 +63,7 @@ const PipelineDisplay = (props) => {
 			 <tbody>
 				{pipelines.map((item, i) => (
 				    <tr key={i}>
-					   <td>{currentCycleOnly === true ?
+					   <td>{recentOnly === true ?
 						   props.pipelines.length - 1 :
 						   pipelines.length - i -1 }</td>
 					   {Object.keys(item).map(key => (

@@ -22,6 +22,7 @@ import { SecondaryButton } from "./styled";
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
 import PipelineDisplay from "./PipelineDisplay.jsx";
+import Help from "./Help";
 import Error from "./Error";
 
 const SimulatorContext = React.createContext(null);
@@ -278,6 +279,8 @@ const App = () => {
 				<Error />
 
 				<UploadMemFileForm />
+
+				<Help />
 
 				<PipelineDisplay pipelines={pipelines} />
 
