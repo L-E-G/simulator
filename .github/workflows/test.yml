@@ -1,0 +1,13 @@
+name: Rust Test
+
+on: [ master, pull_request ]
+jobs:
+  Test:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Branch 📥
+      uses: actions/checkout@v2
+
+    - name: Run Tests 🧪
+      run: cargo test --verbose
