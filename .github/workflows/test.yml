@@ -1,6 +1,7 @@
 name: Rust Test
 
-on: [ master, pull_request ]
+on: [ push, pull_request ]
+
 jobs:
   Test:
     runs-on: ubuntu-latest
