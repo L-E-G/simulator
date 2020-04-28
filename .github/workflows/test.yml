@@ -21,4 +21,5 @@ jobs:
     - name: Rust Node.js Tests 🧪
       run: |
         cd gui
+        npm install
         npm build
