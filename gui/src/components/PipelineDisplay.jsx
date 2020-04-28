@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 
 import styled from "styled-components";
 
@@ -8,26 +8,39 @@ import { Badge } from "./styled";
 
 const PipelineDiv = styled.div`
 margin-left: 1rem;
+margin-right: 1rem;
 `;
 
-const PipelineDisplay = (props) => {
+const NoPipelineBadgeContainer = styled.div`
+text-align: center;
+`;
+
+const PipelineRow = (props) => {
     let pipeline = props.pipeline;
 
-    for (var key in pipeline) {
-	   if (pipeline[key] === null) {
-		  pipeline[key] = "Empty";
-	   }
-    }
+    return (
+	   <td>
+		  {Object.keys(pipeline).map((key) => {
+			 return <StatusBadge status={pipeline[key]} />;
+		  })}
+	   </td>
+    );
+};
 
-    const statuses = Object.keys(pipeline).map((key) => {
-	   return (
-		  <td key={key}>
-			 <h3><Badge>
-				{pipeline[key]}
-			 </Badge></h3>
-		  </td>
-	   );
-    });
+const StatusBadge = (props) => {
+    let status = props.status;
+
+    return (
+	   <td>
+		  <h3><Badge>
+			 {status || "Empty"}
+		  </Badge></h3>
+	   </td>
+    );
+};
+
+const PipelineDisplay = (props) => {
+    let pipelines = props.pipelines;
 
     return (
 	   <PipelineDiv>
@@ -45,12 +58,26 @@ const PipelineDisplay = (props) => {
 				</tr>
 			 </thead>
 			 <tbody>
-				<tr>
-				    <td>0</td>
-				    {statuses}
-				</tr>
+				{pipelines.map((item, i) => (
+				    <tr key={i}>
+				    <td>{pipelines.length - i -1 }</td>
+					   {Object.keys(item).map(key => (
+						  
+						  <td key={`pipeline-cycle-${i}-${key}`}>
+							 <h3><Badge>
+								{item[key] || "Empty"}
+							 </Badge></h3>
+						  </td>
+					   ))}
+				    </tr>
+				))}
 			 </tbody>
 		  </Table>
+
+		  {pipelines.length === 0 ?
+		   <NoPipelineBadgeContainer>
+			  <h3><Badge>No Pipeline Data</Badge></h3>
+		   </NoPipelineBadgeContainer> : null}
 	   </PipelineDiv>
     );
 };

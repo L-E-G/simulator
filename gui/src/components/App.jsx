@@ -136,14 +136,14 @@ class GUISimulator {
     /**
      * @param {Simulator} simulator - Base simulator instance
 	* @param {Object} stateSetters - React hook state setters, keys are: 
-	*     setRegisters, setDRAM, setPipeline, setCycleCount, setProgramStatus.
+	*     setRegisters, setDRAM, setPipelines, setCycleCount, setProgramStatus.
      */
     constructor(simulator, stateSetters) {
 	   this.simulator = simulator;
 	   
 	   this.setRegisters = stateSetters.setRegisters;
 	   this.setDRAM = stateSetters.setDRAM;
-	   this.setPipeline = stateSetters.setPipeline;
+	   this.setPipelines = stateSetters.setPipelines;
 	   this.setCycleCount = stateSetters.setCycleCount;
 	   this.setProgramStatus = stateSetters.setProgramStatus;
     }
@@ -158,11 +158,6 @@ class GUISimulator {
 	   this.setDRAM(this.simulator.get_dram());
     }
 
-    set_pipeline(v) {
-	   this.simulator.set_pipeline(v);
-	   this.setPipeline(this.simulator.get_pipeline());
-    }
-
     step() {
 	   let keepRunning = this.simulator.step();
 
@@ -174,7 +169,7 @@ class GUISimulator {
 	   
 	   this.setRegisters(this.simulator.get_registers());
 	   this.setDRAM(this.simulator.get_dram());
-	   this.setPipeline(this.simulator.get_pipeline());
+	   this.setPipelines(this.simulator.get_pipeline());
 	   this.setCycleCount(this.simulator.get_cycle_count());
     }
 }
@@ -184,7 +179,12 @@ var simulator = new Simulator();
 const App = () => {
     const [registers, setRegisters] = useState(simulator.get_registers());
     const [dram, setDRAM] = useState(simulator.get_dram());
-    const [pipeline, setPipeline] = useState(simulator.get_pipeline());
+    const [pipelines, stateSetPipelines] = useState([simulator.get_pipeline()]);
+    const setPipelines = (newPipeline) => {
+	   var modPipelines = [newPipeline];
+	   modPipelines.push.apply(modPipelines, pipelines);
+	   stateSetPipelines(modPipelines);
+    };
     const [cycleCount, setCycleCount] = useState(simulator.get_cycle_count());
     const [programStatus, setProgramStatus] = useState(PROG_STATUS_NOT_RUNNING);
     const [programPlaying, setProgramPlaying] = useState(false);
@@ -192,7 +192,7 @@ const App = () => {
 
     var guiSimulator = new GUISimulator(simulator, { setRegisters,
 										   setDRAM,
-										   setPipeline,
+										   setPipelines,
 										   setCycleCount,
 										   setProgramStatus });
 
@@ -276,7 +276,7 @@ const App = () => {
 
 				<UploadMemFileForm />
 
-				<PipelineDisplay pipeline={pipeline} />
+				<PipelineDisplay pipelines={pipelines} />
 
 				<Container fluid>
 				    <Row>
