@@ -5,46 +5,47 @@ import styled from "styled-components";
 import Table from "react-bootstrap/Table";
 
 import { Badge } from "./styled";
+import CheckInput from "./CheckInput";
 
 const PipelineDiv = styled.div`
 margin-left: 1rem;
 margin-right: 1rem;
 `;
 
+const CurrentCycleOnlyCheckInput = styled(CheckInput)`
+margin-top: 1rem;
+margin-bottom: 1rem;
+`;
+
 const NoPipelineBadgeContainer = styled.div`
 text-align: center;
 `;
 
-const PipelineRow = (props) => {
-    let pipeline = props.pipeline;
-
-    return (
-	   <td>
-		  {Object.keys(pipeline).map((key) => {
-			 return <StatusBadge status={pipeline[key]} />;
-		  })}
-	   </td>
-    );
-};
-
-const StatusBadge = (props) => {
-    let status = props.status;
-
-    return (
-	   <td>
-		  <h3><Badge>
-			 {status || "Empty"}
-		  </Badge></h3>
-	   </td>
-    );
-};
+const CURRENT_CYCLE_ONLY_KEY = "pipelineCurrentCycleOnly";
 
 const PipelineDisplay = (props) => {
-    let pipelines = props.pipelines;
+    const [currentCycleOnly, setCurrentCycleOnly] = useState(
+	   localStorage.getItem(CURRENT_CYCLE_ONLY_KEY) === "true");
+
+    var pipelines = props.pipelines;
+
+    if (currentCycleOnly === true && props.pipelines.length > 0) {
+	   pipelines = [props.pipelines[0]];
+    }
+
+    const onCurrentCycleOnlyChange = () => {
+	   localStorage.setItem(CURRENT_CYCLE_ONLY_KEY, !currentCycleOnly);
+	   setCurrentCycleOnly(!currentCycleOnly);
+    };
 
     return (
 	   <PipelineDiv>
 		  <h3>Pipeline</h3>
+
+		  <CurrentCycleOnlyCheckInput
+			 value={currentCycleOnly}
+			 onClick={onCurrentCycleOnlyChange}
+			 label="Only Show Current Cycle" />
 
 		  <Table bordered>
 			 <thead>
@@ -60,12 +61,14 @@ const PipelineDisplay = (props) => {
 			 <tbody>
 				{pipelines.map((item, i) => (
 				    <tr key={i}>
-				    <td>{pipelines.length - i -1 }</td>
+					   <td>{currentCycleOnly === true ?
+						   props.pipelines.length - 1 :
+						   pipelines.length - i -1 }</td>
 					   {Object.keys(item).map(key => (
 						  
 						  <td key={`pipeline-cycle-${i}-${key}`}>
 							 <h3><Badge>
-								{item[key] || "Empty"}
+								{item[key]}
 							 </Badge></h3>
 						  </td>
 					   ))}

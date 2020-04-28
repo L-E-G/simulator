@@ -16,7 +16,6 @@ import sleepIcon from "../images/sleep.png";
 import runningIcon from "../images/running.png";
 import happyIcon from "../images/happy.png";
 import playIcon from "../images/play.png";
-import pauseIcon from "../images/pause.png";
 
 import { colors } from "../styles";
 import { Badge, SecondaryButton } from "./styled";
@@ -113,6 +112,10 @@ align-items: center;
 }
 `;
 
+const MemoryContainer = styled(Container)`
+margin-top: 2rem;
+`;
+
 const PC_REG_IDX = 28;
 
 var regAddrAliases = {
@@ -169,8 +172,19 @@ class GUISimulator {
 	   
 	   this.setRegisters(this.simulator.get_registers());
 	   this.setDRAM(this.simulator.get_dram());
-	   this.setPipelines(this.simulator.get_pipeline());
+	   this.setPipelines(this.simulator.get_pipelines());
 	   this.setCycleCount(this.simulator.get_cycle_count());
+    }
+
+    finish_program() {
+	   this.simulator.finish_program();
+
+	   this.setRegisters(this.simulator.get_registers());
+	   this.setDRAM(this.simulator.get_dram());
+	   this.setPipelines(this.simulator.get_pipelines());
+	   this.setCycleCount(this.simulator.get_cycle_count());
+
+	   this.setProgramStatus(PROG_STATUS_COMPLETED);
     }
 }
 
@@ -179,15 +193,9 @@ var simulator = new Simulator();
 const App = () => {
     const [registers, setRegisters] = useState(simulator.get_registers());
     const [dram, setDRAM] = useState(simulator.get_dram());
-    const [pipelines, stateSetPipelines] = useState([simulator.get_pipeline()]);
-    const setPipelines = (newPipeline) => {
-	   var modPipelines = [newPipeline];
-	   modPipelines.push.apply(modPipelines, pipelines);
-	   stateSetPipelines(modPipelines);
-    };
+    const [pipelines, setPipelines] = useState(simulator.get_pipelines());
     const [cycleCount, setCycleCount] = useState(simulator.get_cycle_count());
     const [programStatus, setProgramStatus] = useState(PROG_STATUS_NOT_RUNNING);
-    const [programPlaying, setProgramPlaying] = useState(false);
     const [error, setError] = useState(null);
 
     var guiSimulator = new GUISimulator(simulator, { setRegisters,
@@ -204,12 +212,8 @@ const App = () => {
 	   }
     };
 
-    if (programStatus !== PROG_STATUS_COMPLETED && programPlaying === true) {
-	   onStepClick();
-    }
-
     const onRunClick = () => {
-	   setProgramPlaying(!programPlaying);
+	   guiSimulator.finish_program();
     };
 
     var programStatusImg = sleepIcon;
@@ -243,7 +247,8 @@ const App = () => {
 							 </SimulatorStatusBadge>
 							 
 							 <SimulatorStatusBadge>
-								<b>Program Counter</b>: {registers[PC_REG_IDX]}
+								<b>Program Counter</b>
+								: {registers[PC_REG_IDX]}
 							 </SimulatorStatusBadge>
 							 
 							 <SimulatorStatusBadge>
@@ -253,9 +258,12 @@ const App = () => {
 							 <SimulatorStatusBadge className="has-button">
 								<ControlButton
 								    onClick={onRunClick}
-								    disabled={programStatus === PROG_STATUS_COMPLETED ? true : null}>
-								    <ControlButtonImg src={programStatus === PROG_STATUS_RUNNING ? pauseIcon : playIcon} />
-								    {programStatus === PROG_STATUS_RUNNING ? "Pause" : "Play"}
+								    disabled={programStatus === 
+									   PROG_STATUS_COMPLETED ? 
+										    true : null}>
+								    <ControlButtonImg src={playIcon} />
+
+								    Run
 								</ControlButton>
 							 </SimulatorStatusBadge>
 
@@ -278,7 +286,7 @@ const App = () => {
 
 				<PipelineDisplay pipelines={pipelines} />
 
-				<Container fluid>
+				<MemoryContainer fluid>
 				    <Row>
 					   <Col>
 						  <MemoryTable
@@ -290,7 +298,7 @@ const App = () => {
 						  <MemoryTable title="DRAM" memory={dram} />
 					   </Col>
 				    </Row>
-				</Container>
+				</MemoryContainer>
 			 </SimulatorContext.Provider>
 		  </ErrorContext.Provider>
 	   </AppContainer>

@@ -179,7 +179,7 @@ const UploadMemFileForm = (props) => {
     const ExampleSelectEl = (
 	   <div>
 		  <Form.Group controlId="exampleFileSelect">
-			 <Form.Label>Example DRAM File</Form.Label>
+			 <Form.Label>Example Memory File</Form.Label>
 			 <Form.Control
 				value={exampleFile}
 				onChange={onExampleFileChanged}
