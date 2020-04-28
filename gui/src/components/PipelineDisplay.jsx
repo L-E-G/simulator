@@ -1,37 +1,51 @@
-import React from "react";
+import React, { useState } from "react";
 
 import styled from "styled-components";
 
 import Table from "react-bootstrap/Table";
 
 import { Badge } from "./styled";
+import CheckInput from "./CheckInput";
 
 const PipelineDiv = styled.div`
 margin-left: 1rem;
+margin-right: 1rem;
 `;
 
-const PipelineDisplay = (props) => {
-    let pipeline = props.pipeline;
+const CurrentCycleOnlyCheckInput = styled(CheckInput)`
+margin-top: 1rem;
+margin-bottom: 1rem;
+`;
 
-    for (var key in pipeline) {
-	   if (pipeline[key] === null) {
-		  pipeline[key] = "Empty";
-	   }
+const NoPipelineBadgeContainer = styled.div`
+text-align: center;
+`;
+
+const CURRENT_CYCLE_ONLY_KEY = "pipelineCurrentCycleOnly";
+
+const PipelineDisplay = (props) => {
+    const [currentCycleOnly, setCurrentCycleOnly] = useState(
+	   localStorage.getItem(CURRENT_CYCLE_ONLY_KEY) === "true");
+
+    var pipelines = props.pipelines;
+
+    if (currentCycleOnly === true && props.pipelines.length > 0) {
+	   pipelines = [props.pipelines[0]];
     }
 
-    const statuses = Object.keys(pipeline).map((key) => {
-	   return (
-		  <td key={key}>
-			 <h3><Badge>
-				{pipeline[key]}
-			 </Badge></h3>
-		  </td>
-	   );
-    });
+    const onCurrentCycleOnlyChange = () => {
+	   localStorage.setItem(CURRENT_CYCLE_ONLY_KEY, !currentCycleOnly);
+	   setCurrentCycleOnly(!currentCycleOnly);
+    };
 
     return (
 	   <PipelineDiv>
 		  <h3>Pipeline</h3>
+
+		  <CurrentCycleOnlyCheckInput
+			 value={currentCycleOnly}
+			 onClick={onCurrentCycleOnlyChange}
+			 label="Only Show Current Cycle" />
 
 		  <Table bordered>
 			 <thead>
@@ -45,12 +59,28 @@ const PipelineDisplay = (props) => {
 				</tr>
 			 </thead>
 			 <tbody>
-				<tr>
-				    <td>0</td>
-				    {statuses}
-				</tr>
+				{pipelines.map((item, i) => (
+				    <tr key={i}>
+					   <td>{currentCycleOnly === true ?
+						   props.pipelines.length - 1 :
+						   pipelines.length - i -1 }</td>
+					   {Object.keys(item).map(key => (
+						  
+						  <td key={`pipeline-cycle-${i}-${key}`}>
+							 <h3><Badge>
+								{item[key]}
+							 </Badge></h3>
+						  </td>
+					   ))}
+				    </tr>
+				))}
 			 </tbody>
 		  </Table>
+
+		  {pipelines.length === 0 ?
+		   <NoPipelineBadgeContainer>
+			  <h3><Badge>No Pipeline Data</Badge></h3>
+		   </NoPipelineBadgeContainer> : null}
 	   </PipelineDiv>
     );
 };

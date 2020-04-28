@@ -1,16 +1,18 @@
-name: Rust Test
+name: Deploy
 
-on: [push]
+on:
+  push:
+    branches: [ master ]
 
 jobs:
-  TestAndDeploy:
+  Deploy:
     runs-on: ubuntu-latest
 
     steps:
     - name: Checkout Branch 📥
       uses: actions/checkout@v2
 
-    - name: Run Tests 🧪
+    - name: Run Rust Tests 🧪
       run: cargo test --verbose
 
     - name: Use Node.js 📦

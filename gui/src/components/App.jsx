@@ -11,6 +11,10 @@ import { Simulator } from "simulator";
 
 import logoIcon from "../images/logo.png";
 import stepIcon from "../images/step.png";
+import sleepIcon from "../images/sleep.png";
+import runningIcon from "../images/running.png";
+import happyIcon from "../images/happy.png";
+import playIcon from "../images/play.png";
 
 import { colors } from "../styles";
 import { SecondaryButton } from "./styled";
@@ -22,6 +26,10 @@ import Error from "./Error";
 
 const SimulatorContext = React.createContext(null);
 const ErrorContext = React.createContext([{}, () => {}]);
+
+const AppContainer = styled.div`
+margin-top: 5rem;
+`;
 
 const AppNavbar = styled(Navbar)`
 background: ${colors.primary};
@@ -41,23 +49,79 @@ margin-left: 10px;
 color: white;
 `;
 
-const StepButton = styled(SecondaryButton)`
-float: right;
+const ControlButton = styled(SecondaryButton)`
+background: none;
+color: ${colors.primary};
+border: 0;
 `;
 
-const StepImg = styled.img`
+const ControlButtonImg = styled.img`
 width: 1.5rem;
 margin-right: 0.5rem;    
 `;
 
-const regAddrAliases = {
+const SimulatorStatusesContainer = styled.div`
+display: flex;
+justify-content: center;
+`;
+
+const SimulatorStatuses = styled.div`
+display: flex;
+border-radius: 0.25rem;
+border: none;
+background: ${colors.secondary};
+`;
+
+const SimulatorStatusBadge = styled.div`
+border-left: 0.1rem solid ${colors.primary};
+display: flex;
+padding: 0.5rem;
+color: white;
+align-items: center;
+
+&:first-of-type {
+    border-left: none;
+}
+
+&.has-button {
+    padding: 0;
+    transition: background 0.15s;
+}
+
+&.has-button button {
+    border-radius: 0;
+    color: white;
+}
+
+&.has-button button:hover {
+    background: white;
+    color: ${colors.primary};
+    border-radius: 0.25rem;
+}
+
+&.has-button:hover {
+    background: white;
+}
+`;
+
+const MemoryContainer = styled(Container)`
+margin-top: 2rem;
+`;
+
+const PC_REG_IDX = 28;
+
+var regAddrAliases = {
     26: "INTLR",
     27: "IHDLR",
-    28: "PC",
     29: "STATUS",
     30: "SP",
     31: "LR",
 };
+regAddrAliases[PC_REG_IDX] = "PC";
+
+const PROG_STATUS_COMPLETED = "Completed";
+const PROG_STATUS_NOT_RUNNING = "Not Running";
+const PROG_STATUS_RUNNING = "Running";
 
 /**
  * Wraps Simulator class methods so that the React state is updated when the
@@ -67,14 +131,16 @@ class GUISimulator {
     /**
      * @param {Simulator} simulator - Base simulator instance
 	* @param {Object} stateSetters - React hook state setters, keys are: 
-	*     setRegisters, setDRAM, setPipeline.
+	*     setRegisters, setDRAM, setPipelines, setCycleCount, setProgramStatus.
      */
     constructor(simulator, stateSetters) {
 	   this.simulator = simulator;
 	   
 	   this.setRegisters = stateSetters.setRegisters;
 	   this.setDRAM = stateSetters.setDRAM;
-	   this.setPipeline = stateSetters.setPipeline;
+	   this.setPipelines = stateSetters.setPipelines;
+	   this.setCycleCount = stateSetters.setCycleCount;
+	   this.setProgramStatus = stateSetters.setProgramStatus;
     }
 
     set_registers(v) {
@@ -87,17 +153,30 @@ class GUISimulator {
 	   this.setDRAM(this.simulator.get_dram());
     }
 
-    set_pipeline(v) {
-	   this.simulator.set_pipeline(v);
-	   this.setPipeline(this.simulator.get_pipeline());
-    }
-
     step() {
-	   this.simulator.step();
+	   let keepRunning = this.simulator.step();
+
+	   if (keepRunning === true) {
+		  this.setProgramStatus(PROG_STATUS_RUNNING);
+	   } else {
+		  this.setProgramStatus(PROG_STATUS_COMPLETED);
+	   }
 	   
 	   this.setRegisters(this.simulator.get_registers());
 	   this.setDRAM(this.simulator.get_dram());
-	   this.setPipeline(this.simulator.get_pipeline());
+	   this.setPipelines(this.simulator.get_pipelines());
+	   this.setCycleCount(this.simulator.get_cycle_count());
+    }
+
+    finish_program() {
+	   this.simulator.finish_program();
+
+	   this.setRegisters(this.simulator.get_registers());
+	   this.setDRAM(this.simulator.get_dram());
+	   this.setPipelines(this.simulator.get_pipelines());
+	   this.setCycleCount(this.simulator.get_cycle_count());
+
+	   this.setProgramStatus(PROG_STATUS_COMPLETED);
     }
 }
 
@@ -106,11 +185,16 @@ var simulator = new Simulator();
 const App = () => {
     const [registers, setRegisters] = useState(simulator.get_registers());
     const [dram, setDRAM] = useState(simulator.get_dram());
-    const [pipeline, setPipeline] = useState(simulator.get_pipeline());
+    const [pipelines, setPipelines] = useState(simulator.get_pipelines());
+    const [cycleCount, setCycleCount] = useState(simulator.get_cycle_count());
+    const [programStatus, setProgramStatus] = useState(PROG_STATUS_NOT_RUNNING);
     const [error, setError] = useState(null);
 
-    var guiSimulator = new GUISimulator(simulator, { setRegisters,setDRAM,
-										   setPipeline });
+    var guiSimulator = new GUISimulator(simulator, { setRegisters,
+										   setDRAM,
+										   setPipelines,
+										   setCycleCount,
+										   setProgramStatus });
 
     const onStepClick = () => {
 	   try {
@@ -120,33 +204,84 @@ const App = () => {
 	   }
     };
 
+    const onRunClick = () => {
+	   guiSimulator.finish_program();
+    };
+
+    var programStatusImg = null;
+
+    switch (programStatus) {
+	   case PROG_STATUS_RUNNING:
+		  programStatusImg = runningIcon;
+		  break;
+	   case PROG_STATUS_COMPLETED:
+		  programStatusImg = happyIcon;
+		  break;
+	   default:
+		  programStatusImg = sleepIcon;
+		  break;
+    }
+
     return (
-	   <div>
+	   <AppContainer>
 		  <ErrorContext.Provider value={[error, setError]}>
 			 <SimulatorContext.Provider value={guiSimulator}>
-				<AppNavbar expand="md">
+				<AppNavbar expand="md" fixed="top">
 				    <Navbar.Brand>
 					   <BrandImg src={logoIcon} alt="LEG computer logo" />
 					   <BrandName>LEG Simulator</BrandName>
 				    </Navbar.Brand>
 
-				    <Navbar.Collapse className="justify-content-end">
-					   <Navbar.Text>
-						  <StepButton onClick={onStepClick}>
-							 <StepImg src={stepIcon} />
-							 Step
-						  </StepButton>
-					   </Navbar.Text>
-				    </Navbar.Collapse>
+				    <Navbar.Text>
+					   <SimulatorStatusesContainer>
+						  <SimulatorStatuses>
+							 <SimulatorStatusBadge>
+								<ControlButtonImg src={programStatusImg} />
+								
+								<b>{programStatus}</b>
+							 </SimulatorStatusBadge>
+							 
+							 <SimulatorStatusBadge>
+								<b>Program Counter</b>
+								: {registers[PC_REG_IDX]}
+							 </SimulatorStatusBadge>
+							 
+							 <SimulatorStatusBadge>
+								<b>Cycle Count</b>: {cycleCount}
+							 </SimulatorStatusBadge>
+
+							 <SimulatorStatusBadge className="has-button">
+								<ControlButton
+								    onClick={onRunClick}
+								    disabled={programStatus === 
+									   PROG_STATUS_COMPLETED ? 
+										    true : null}>
+								    <ControlButtonImg src={playIcon} />
+
+								    Run
+								</ControlButton>
+							 </SimulatorStatusBadge>
+
+							 <SimulatorStatusBadge className="has-button">
+								<ControlButton
+								    onClick={onStepClick}
+								    disabled={programStatus === PROG_STATUS_COMPLETED  ? true : null}>
+								    <ControlButtonImg src={stepIcon} />
+								    Step
+								</ControlButton>
+							 </SimulatorStatusBadge>
+						  </SimulatorStatuses>
+					   </SimulatorStatusesContainer>
+				    </Navbar.Text>
 				</AppNavbar>
 
 				<Error />
 
 				<UploadMemFileForm />
 
-				<PipelineDisplay pipeline={pipeline} />
+				<PipelineDisplay pipelines={pipelines} />
 
-				<Container fluid>
+				<MemoryContainer fluid>
 				    <Row>
 					   <Col>
 						  <MemoryTable
@@ -158,10 +293,10 @@ const App = () => {
 						  <MemoryTable title="DRAM" memory={dram} />
 					   </Col>
 				    </Row>
-				</Container>
+				</MemoryContainer>
 			 </SimulatorContext.Provider>
 		  </ErrorContext.Provider>
-	   </div>
+	   </AppContainer>
     );
 };
 
