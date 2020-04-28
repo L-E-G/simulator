@@ -71,9 +71,9 @@ impl InstructionT {
     /// Returns the value of the type field for the represented instruction type.
     pub fn value(self) -> u32 {
         match self {
-            InstructionT::ALU => 0,
-            InstructionT::Memory => 1,
-            InstructionT::Control => 2,
+            InstructionT::Control => 0,
+            InstructionT::ALU => 1,
+            InstructionT::Memory => 2,
             InstructionT::Graphics => 3,
         }
     }
@@ -81,9 +81,9 @@ impl InstructionT {
     /// Matches a value to an instruction type.
     pub fn match_val(val: u32) -> Option<InstructionT> {
         match val {
-            0 => Some(InstructionT::ALU),
-            1 => Some(InstructionT::Memory),
-            2 => Some(InstructionT::Control),
+            0 => Some(InstructionT::Control),
+            1 => Some(InstructionT::ALU),
+            2 => Some(InstructionT::Memory),
             3 => Some(InstructionT::Graphics),
             _ => None,
         }
@@ -105,6 +105,62 @@ impl Display for AddrMode {
         match self {
             AddrMode::RegisterDirect => write!(f, "RD"),
             AddrMode::Immediate => write!(f, "I"),
+        }
+    }
+}
+
+
+/// Identifies control operations.
+#[derive(PartialEq,Debug)]
+pub ControlOp {
+    Halt,
+    Jump
+}
+
+impl ControlOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            ControlOp::Halt => 0,
+            ControlOp::Jump => 1,
+        }
+    }
+
+    /// Matches a value with a ControlOp.
+    pub fn match_val(val: u32) -> Option<ControlOp> {
+        match val {
+            0 => ControlOp::Halt,
+            1 => ControlOp::Jump,
+            _ => None,
+        }
+    }
+}
+
+/// Identifies arithmetic operations.
+#[derive(PartialEq,Debug)]
+pub ALUOp {
+    AddUnsignedI,
+    Move,
+    Compare,
+}
+
+impl ALUOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            ALUOp::AddUnsignedI => 2,
+            ALUOp::Move => 12,
+            ALUOp::Compare => 13,
+        }
+    }
+
+    /// Matches a value with a ALUOp.
+    pub fn match_val(val: u32) -> Option<ALUOp> {
+        match val {
+            2 => ALUOp::AddUnsignedI,
+            12 => ALUOp::Move,
+            13 => ALUOp::Compare,
+            _ => None,
         }
     }
 }

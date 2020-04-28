@@ -1,0 +1,3 @@
+	ADD R0 R0 0d15
+	STR R0 0d1
+	HALT
