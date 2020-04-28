@@ -10,5 +10,15 @@ jobs:
     - name: Checkout Branch 📥
       uses: actions/checkout@v2
 
-    - name: Run Tests 🧪
+    - name: Use Node.js 📦
+      uses: actions/setup-node@v1
+      with:
+        node-version: '13.x'
+
+    - name: Run Rust Tests 🧪
       run: cargo test --verbose
+
+    - name: Rust Node.js Tests 🧪
+      run: |
+        cd gui
+        npm build
