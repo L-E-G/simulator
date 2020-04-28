@@ -12,7 +12,7 @@ import Spinner from "react-bootstrap/Spinner";
 import { SimulatorContext, ErrorContext } from "./App.jsx";
 import ToggleExpandButton from "./ToggleExpandButton.jsx";
 import CheckInput from "./CheckInput";
-import { PrimaryButton, SecondaryButton } from "./styled";
+import { PrimaryButton } from "./styled";
 
 import { colors } from "../styles";
 

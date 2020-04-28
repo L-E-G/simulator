@@ -6,7 +6,6 @@ import Navbar from "react-bootstrap/Navbar";
 import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
-import Spinner from "react-bootstrap/Spinner";
 
 import { Simulator } from "simulator";
 
@@ -18,7 +17,7 @@ import happyIcon from "../images/happy.png";
 import playIcon from "../images/play.png";
 
 import { colors } from "../styles";
-import { Badge, SecondaryButton } from "./styled";
+import { SecondaryButton } from "./styled";
 
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
@@ -48,13 +47,6 @@ transition-duration: 1s;
 const BrandName = styled.span`
 margin-left: 10px;
 color: white;
-`;
-
-const StatusBadge = styled(Badge)`
-padding: 0.7rem;
-margin-right: 1rem;
-font-size: 1rem;
-font-weight: normal;
 `;
 
 const ControlButton = styled(SecondaryButton)`
@@ -216,7 +208,7 @@ const App = () => {
 	   guiSimulator.finish_program();
     };
 
-    var programStatusImg = sleepIcon;
+    var programStatusImg = null;
 
     switch (programStatus) {
 	   case PROG_STATUS_RUNNING:
@@ -224,6 +216,9 @@ const App = () => {
 		  break;
 	   case PROG_STATUS_COMPLETED:
 		  programStatusImg = happyIcon;
+		  break;
+	   default:
+		  programStatusImg = sleepIcon;
 		  break;
     }
 
