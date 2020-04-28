@@ -15,11 +15,18 @@ jobs:
       with:
         node-version: '13.x'
 
+    - name: Install GUI Build Dependencies 📦
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl rsync
+        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
+
     - name: Run Rust Tests 🧪
       run: cargo test --verbose
 
-    - name: Rust Node.js Tests 🧪
+    - name: Run GUI Tests 🧪
       run: |
+        wasm-pack build --release
         cd gui
         npm install
-        npm build
+        npm run prod-build
