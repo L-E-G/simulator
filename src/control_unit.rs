@@ -6,7 +6,12 @@ use std::fmt;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
-use crate::instructions::{Instruction,InstructionT,MemoryOp,AddrMode,Load,Store};
+use crate::instructions::{Instruction,InstructionT,
+    MemoryOp,AddrMode,Load,Store,
+    ArithMode,ALUOp,Move,ArithSign,ArithUnsign,
+    Comp,AS,LS,LogicType,ThreeOpLogic,Not,
+    ControlOp,Jump,SIH,INT,JOOI,
+};
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
@@ -170,26 +175,139 @@ impl ControlUnit {
                 let icreate: Result<Box<dyn Instruction>, String> =
                 // Match instruction type
                     match InstructionT::match_val(itype) {
-                        Some(InstructionT::Memory) => {
-                            let iop = fetch_inst.get_bits(7..=9) as u32;
+                    Some(InstructionT::Memory) => {
+                        let iop = fetch_inst.get_bits(7..=9) as u32;
 
-                            match MemoryOp::match_val(iop) {
-                                Some(MemoryOp::LoadRD) => Ok(Box::new(
-                                    Load::new(AddrMode::RegisterDirect))),
-                                Some(MemoryOp::LoadI) => Ok(Box::new(
-                                    Load::new(AddrMode::Immediate))),
-                                // TODO: Make Store instruction take AddrMode parameter
-                                // TODO: Make seperate branch for StoreRD & StoreI
-                                Some(MemoryOp::StoreRD) => Ok(Box::new(
-                                    Store::new())),
-                                _ => Err(format!("Invalid operation code {} for \
-                                                  mememory type instruction",
-                                                 iop)),
-                            }
-                        },
-                        _ => Err(format!("Invalid type value {} for instruction",
-                                         itype)),
-                    };
+                        match MemoryOp::match_val(iop) {
+                            Some(MemoryOp::LoadRD) => Ok(Box::new(
+                                Load::new(AddrMode::RegisterDirect))),
+                            Some(MemoryOp::LoadI) => Ok(Box::new(
+                                Load::new(AddrMode::Immediate))),
+                            Some(MemoryOp::StoreRD) => Ok(Box::new(
+                                Store::new(AddrMode::RegisterDirect))),
+                            Some(MemoryOp::StoreI) => Ok(Box::new(
+                                Store::new(AddrMode::Immediate))),
+                            _ => Err(format!("Invalid operation code {} for \
+                                              mememory type instruction", iop)),
+                        }
+                    },
+
+                    Some(InstructionT::Control) => {
+                        let iop = fetch_inst.get_bits(7..=9) as u32;
+                        match ControlOp::match_val(iop) {
+                            Some(ControlOp::JmpRD) => Ok(Box::new(
+                                Jump::new(AddrMode::RegisterDirect, false))),
+                            Some(ControlOp::JmpI) => Ok(Box::new(
+                                Jump::new(AddrMode::Immediate, false))),
+                            Some(ControlOp::JmpSRD) => Ok(Box::new(
+                                Jump::new(AddrMode::RegisterDirect, true))),
+                            Some(ControlOp::JmpSI) => Ok(Box::new(
+                                Jump::new(AddrMode::Immediate, true))),
+                            Some(ControlOp::Sih) => Ok(Box::new(
+                                SIH::new())),
+                            Some(ControlOp::IntRD) => Ok(Box::new(
+                                INT::new(AddrMode::RegisterDirect))),
+                            Some(ControlOp::IntI) => Ok(Box::new(
+                                INT::new(AddrMode::Immediate))),
+                            Some(ControlOp::Ijmp) => Ok(Box::new(
+                                JOOI::new())),
+                            _ => Err(format!("Invalid operation code {} for \
+                                            Control type instruction", iop)),
+                        }
+                    }
+
+                    // Immediates:
+                    // Unsigned = false
+                    // Signed = true
+                    Some(InstructionT::ALU) => {
+                        let iop = fetch_inst.get_bits(7..=12) as u32;
+
+                        match ALUOp::match_val(iop) {    // Don't quite know how to add sign/unsign
+                            Some(ALUOp::Move) => Ok(Box::new(
+                                Move::new())),
+                            // ---- Add ----
+                            Some(ALUOp::AddUIRD) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                            Some(ALUOp::AddUII) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Add))),
+                            Some(ALUOp::AddSIRD) => Ok(Box::new(
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Add))),
+                            Some(ALUOp::AddSII) => Ok(Box::new(
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Add))),
+                            // ---- Sub ----
+                            Some(ALUOp::SubUIRD) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                            Some(ALUOp::SubUII) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Sub))),
+                            Some(ALUOp::SubSIRD) => Ok(Box::new(
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Sub))),
+                            Some(ALUOp::SubSII) => Ok(Box::new(
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Sub))),
+                            // ---- Mul ----
+                            Some(ALUOp::MulUIRD) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                            Some(ALUOp::MulUII) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Mul))),
+                            Some(ALUOp::MulSIRD) => Ok(Box::new(
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Mul))),
+                            Some(ALUOp::MulSII) => Ok(Box::new(
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Mul))),
+                            // ---- Div ----
+                            Some(ALUOp::DivUIRD) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                            Some(ALUOp::DivUII) => Ok(Box::new(
+                                ArithUnsign::new(AddrMode::Immediate, ArithMode::Div))),
+                            Some(ALUOp::DivSIRD) => Ok(Box::new(
+                                ArithSign::new(AddrMode::RegisterDirect, ArithMode::Div))),
+                            Some(ALUOp::DivSII) => Ok(Box::new(
+                                ArithSign::new(AddrMode::Immediate, ArithMode::Div))),
+                            // ---- Comp ----
+                            Some(ALUOp::CompUI) => Ok(Box::new(
+                                Comp::new(false))),
+                            Some(ALUOp::CompSI) => Ok(Box::new(
+                                Comp::new(true))),
+                            // ---- Arithmetic Shift ----
+                            Some(ALUOp::ASLRD) => Ok(Box::new(
+                                AS::new(AddrMode::RegisterDirect, false))),
+                            Some(ALUOp::ASLI) => Ok(Box::new(
+                                AS::new(AddrMode::Immediate, false))),
+                            Some(ALUOp::ASRRD) => Ok(Box::new(
+                                AS::new(AddrMode::RegisterDirect, true))),
+                            Some(ALUOp::ASRI) => Ok(Box::new(
+                                AS::new(AddrMode::Immediate, true))),
+                            // ---- Logical Shift ----
+                            Some(ALUOp::LSLRD) => Ok(Box::new(
+                                LS::new(AddrMode::RegisterDirect, false))),
+                            Some(ALUOp::LSLI) => Ok(Box::new(
+                                LS::new(AddrMode::Immediate, false))),
+                            Some(ALUOp::LSRRD) => Ok(Box::new(
+                                LS::new(AddrMode::RegisterDirect, true))),
+                            Some(ALUOp::LSRI) => Ok(Box::new(
+                                LS::new(AddrMode::Immediate, true))),
+                            // ---- 3 Operation Logic ----
+                            Some(ALUOp::AndRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::And))),
+                            Some(ALUOp::AndI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::And))),
+                            Some(ALUOp::OrRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::Or))),
+                            Some(ALUOp::OrI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::Or))),
+                            Some(ALUOp::XorRD) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::RegisterDirect, LogicType::Xor))),
+                            Some(ALUOp::XorI) => Ok(Box::new(
+                                ThreeOpLogic::new(AddrMode::Immediate, LogicType::Xor))),
+                            // ---- Not ----
+                            Some(ALUOp::Not) => Ok(Box::new(
+                                Not::new())),
+                            
+                            _ => Err(format!("Invalid operation code {} for \
+                                ALU type instruction", iop)),
+                        }
+                    }
+                    _ => Err(format!("Invalid type value {} for instruction",
+                                        itype)),
+                };
 
                 // Run instruction specific decode
                 self.decode_instruction = match icreate {
