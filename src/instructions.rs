@@ -106,7 +106,7 @@ impl InterruptCodes {
             InterruptCodes::ENTER => 0100,
             InterruptCodes::ESCAPE => 0101,
             InterruptCodes::SPACE => 0110,
-            InterruptCodes::NOT_SET_INITIAL => 11111111111,
+            InterruptCodes::NOT_SET_INITIAL => 111111,
             InterruptCodes::NOT_SET => 000000,
             InterruptCodes::SET => 100000,
         }
