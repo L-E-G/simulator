@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC};
+use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR,INTLR};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -90,6 +90,29 @@ impl InstructionT {
     }
 }
 
+pub enum InterruptCodes {
+    UPARROW, DOWNARROW, LEFTARROW, 
+    RIGHTARROW, ENTER, ESCAPE, SPACE, 
+    NOT_SET_INITIAL, NOT_SET, SET
+}
+
+impl InterruptCodes {
+    pub fn value(self) -> usize {
+        match self {
+            InterruptCodes::UPARROW => 0000,
+            InterruptCodes::DOWNARROW => 0001,
+            InterruptCodes::LEFTARROW => 0010,
+            InterruptCodes::RIGHTARROW => 0011,
+            InterruptCodes::ENTER => 0100,
+            InterruptCodes::ESCAPE => 0101,
+            InterruptCodes::SPACE => 0110,
+            InterruptCodes::NOT_SET_INITIAL => 111111,
+            InterruptCodes::NOT_SET => 000000,
+            InterruptCodes::SET => 100000,
+        }
+    }
+}
+
 /// Identifies the addressing mode of an instruction operand.
 #[derive(PartialEq,Debug)]
 pub enum AddrMode {
@@ -105,6 +128,42 @@ impl Display for AddrMode {
         match self {
             AddrMode::RegisterDirect => write!(f, "RD"),
             AddrMode::Immediate => write!(f, "I"),
+        }
+    }
+}
+
+#[derive(PartialEq,Debug)]
+pub enum ArithMode {
+    Add,
+    Sub,
+    Mul,
+    Div,
+}
+
+impl Display for ArithMode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ArithMode::Add => write!(f, "Add"),
+            ArithMode::Sub => write!(f, "Sub"),
+            ArithMode::Mul => write!(f, "Mult"),
+            ArithMode::Div => write!(f, "Div"),
+        }
+    }
+}
+
+#[derive(PartialEq,Debug)]
+pub enum LogicType {
+    And,
+    Or,
+    Xor,
+}
+
+impl Display for LogicType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            LogicType::And => write!(f, "And"),
+            LogicType::Or => write!(f, "Or"),
+            LogicType::Xor => write!(f, "Xor"),
         }
     }
 }
@@ -144,6 +203,150 @@ impl MemoryOp {
         }
     }
 }
+
+/// UI = Unsigned Integer
+/// SI = Signed Integer
+/// RD = Register Direct
+/// I  = Immediate
+#[derive(PartialEq,Debug)]
+pub enum ALUOp {
+    AddUIRD, AddUII, AddSIRD, AddSII,
+    SubUIRD, SubUII, SubSIRD, SubSII,
+    MulUIRD, MulUII, MulSIRD, MulSII, 
+    DivUIRD, DivUII, DivSIRD, DivSII,
+    Move, 
+    CompUI, CompSI, 
+    ASLRD, ASLI, ASRRD, ASRI,
+    LSLRD, LSLI, LSRRD, LSRI,
+    AndRD, AndI,
+    OrRD, OrI,
+    XorRD, XorI,
+    Not, 
+}
+impl ALUOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            ALUOp::AddUIRD => 0,
+            ALUOp::AddUII => 1,
+            ALUOp::AddSIRD => 2,
+            ALUOp::AddSII => 3,
+            ALUOp::SubUIRD => 4,
+            ALUOp::SubUII => 5,
+            ALUOp::SubSIRD => 6,
+            ALUOp::SubSII => 7,
+            ALUOp::MulUIRD => 8,
+            ALUOp::MulUII => 9,
+            ALUOp::MulSIRD => 10,
+            ALUOp::MulSII => 11,
+            ALUOp::DivUIRD => 12,
+            ALUOp::DivUII => 13,
+            ALUOp::DivSIRD => 14,
+            ALUOp::DivSII => 15,
+            ALUOp::Move => 16,
+            ALUOp::CompUI => 17,
+            ALUOp::CompSI => 18,
+            ALUOp::ASLRD => 19,
+            ALUOp::ASLI => 20,
+            ALUOp::ASRRD => 21,
+            ALUOp::ASRI => 22,
+            ALUOp::LSLRD => 23,
+            ALUOp::LSLI => 24,
+            ALUOp::LSRRD => 25,
+            ALUOp::LSRI => 26,
+            ALUOp::AndRD => 27,
+            ALUOp::AndI => 28,
+            ALUOp::OrRD => 29,
+            ALUOp::OrI => 30,
+            ALUOp::XorRD => 31,
+            ALUOp::XorI => 32,
+            ALUOp::Not => 33,
+        }
+    }
+
+    /// Matches a value with a MemoryOp.
+    pub fn match_val(val: u32) -> Option<ALUOp> {
+        match val {
+            0 => Some(ALUOp::AddUIRD),
+            1 => Some(ALUOp::AddUII),
+            2 => Some(ALUOp::AddSIRD),
+            3 => Some(ALUOp::AddSII),
+            4 => Some(ALUOp::SubUIRD),
+            5 => Some(ALUOp::SubUII),
+            6 => Some(ALUOp::SubSIRD),
+            7 => Some(ALUOp::SubSII),
+            8 => Some(ALUOp::MulUIRD),
+            9 => Some(ALUOp::MulUII),
+            10 => Some(ALUOp::MulSIRD),
+            11 => Some(ALUOp::MulSII),
+            12 => Some(ALUOp::DivUIRD),
+            13 => Some(ALUOp::DivUII),
+            14 => Some(ALUOp::DivSIRD),
+            15 => Some(ALUOp::DivSII),
+            16 => Some(ALUOp::Move),
+            17 => Some(ALUOp::CompUI),
+            18 => Some(ALUOp::CompSI),
+            19 => Some(ALUOp::ASLRD),
+            20 => Some(ALUOp::ASLI),
+            21 => Some(ALUOp::ASRRD),
+            22 => Some(ALUOp::ASRI),
+            23 => Some(ALUOp::LSLRD),
+            24 => Some(ALUOp::LSLI),
+            25 => Some(ALUOp::LSRRD),
+            26 => Some(ALUOp::LSRI),
+            27 => Some(ALUOp::AndRD),
+            28 => Some(ALUOp::AndI),
+            29 => Some(ALUOp::OrRD),
+            30 => Some(ALUOp::OrI),
+            31 => Some(ALUOp::XorRD),
+            32 => Some(ALUOp::XorI),
+            33 => Some(ALUOp::Not),
+            _ => None,
+        }
+    }
+}
+
+#[derive(PartialEq,Debug)]
+pub enum ControlOp {
+    JmpRD, JmpI,
+    JmpSRD, JmpSI,
+    Sih,
+    IntRD, IntI, 
+    Ijmp,
+}
+
+impl ControlOp {
+    /// Returns the value of the operation field for the represented operation.
+    pub fn value(self) -> u32 {
+        match self {
+            ControlOp::JmpRD => 0,
+            ControlOp::JmpI => 1,
+            ControlOp::JmpSRD => 2,
+            ControlOp::JmpSI => 3,
+            ControlOp::Sih => 4,
+            ControlOp::IntRD => 5,
+            ControlOp::IntI => 6,
+            ControlOp::Ijmp => 7,
+        }
+    }
+
+    /// Matches a value with a MemoryOp.
+    pub fn match_val(val: u32) -> Option<ControlOp> {
+        match val {
+            0 => Some(ControlOp::JmpRD),
+            1 => Some(ControlOp::JmpI),
+            2 => Some(ControlOp::JmpSRD),
+            3 => Some(ControlOp::JmpSI),
+            4 => Some(ControlOp::Sih),
+            5 => Some(ControlOp::IntRD),
+            6 => Some(ControlOp::IntI),
+            7 => Some(ControlOp::Ijmp),
+            _ => None,
+        }
+    }
+}
+
+// ---------------------------------- Memory Instructions ----------------------------------
 
 /// Read a value from an address in memory and place it in a register.
 #[derive(Debug)]
@@ -221,6 +424,8 @@ impl Instruction for Load {
 /// Writes a value in memory from a register.
 #[derive(Debug)]
 pub struct Store {
+    /// Address mode of instruction.
+    mem_addr_mode: AddrMode,
     /// Address in memory to save value.
     dest_addr: u32,
 
@@ -230,8 +435,9 @@ pub struct Store {
 
 impl Store {
     /// Create an empty store instruction.
-    pub fn new() -> Store {
+    pub fn new(mem_addr_mode: AddrMode) -> Store {
         Store{
+            mem_addr_mode: mem_addr_mode,
             dest_addr: 0,
             value: 0,
         }
@@ -247,8 +453,13 @@ impl Display for Store {
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[((instruction << 17) >> 26) as usize];
-        self.dest_addr = registers[((instruction << 12) >> 26) as usize];
+        self.dest_addr = registers[instruction.get_bits(11..=15) as usize] as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.value = registers[instruction.get_bits(16..=20) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.value = (((registers[PC] + 1) as i32) + (instruction.get_bits(16..=31) as i32)) as u32;
+        }
 
         SimResult::Wait(0, ())
     }
@@ -274,10 +485,11 @@ impl Instruction for Store {
     }
 }
 
-/*
-struct Move {
+// ---------------------------------- ALU Instructions ----------------------------------
+
+#[derive(Debug)]
+pub struct Move {
     dest: usize,
-    src_reg: usize,
     value: u32,
 }
 
@@ -285,9 +497,14 @@ impl Move {
     pub fn new() -> Move {
         Move{
             dest: 0,
-            src_reg: 0,
             value: 0,
         }
+    }
+}
+
+impl Display for Move {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Move")
     }
 }
 
@@ -297,30 +514,20 @@ impl Instruction for Move {
     /// Extract destination register from the instruction.
     /// Extract source register that holds the value to move.
     /// Get the value to move and add it to the value field.
-    fn decode(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
-        }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.value = registers[instruction.get_bits(16..=20) as usize];
 
-        self.dest = (instbin << 13) >> 31;
+        self.dest = instruction.get_bits(11..=15) as usize;
 
-        self.src_reg = (instbin << 18) >> 31;
-
-        self.value = registers[self.src_reg];
         return SimResult::Wait(0, ());
     }
 
-    /// Skip, no execution.
+    /// No execution stage.
     fn execute(&mut self) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
-    /// Skip, no memory accessing.
+    /// No memory accessing.
     fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -332,19 +539,22 @@ impl Instruction for Move {
     }
 }
 
-struct AddUIImm {
+#[derive(Debug)]
+pub struct ArithSign {
+    mem_addr_mode: AddrMode,
     dest: usize,
-    src_reg: usize,
-    op1: usize,
-    op2: usize,
-    result: u32,
+    operation: ArithMode,
+    op1: i32,
+    op2: i32,
+    result: i32,
 }
 
-impl AddUIImm {
-    pub fn new() -> AddUIImm {
-        AddUIImm{
+impl ArithSign {
+    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> ArithSign {
+        ArithSign{
+            mem_addr_mode: mem_addr_mode,
+            operation: operation,
             dest: 0,
-            src_reg: 0,
             op1: 0,
             op2: 0,
             result: 0,
@@ -352,50 +562,230 @@ impl AddUIImm {
     }
 }
 
-impl Instruction for AddUIImm {
-    /// Convert instruction to String, then to &str so we can convert it to a usize
-    /// so that we can perform binary operations on it.
-    /// Extract the value of the destination register from instruction.
-    /// Extract the value of the immediate value.
-    /// Extract the value of the source register that stored one of the operands.
-    /// Convert the operand from the register to a String, then to a &str so that we 
-    /// can convert it to a usize so we can perform binary operations to it.
-    fn decode(&mut self, instruction: u32, registers: &mut Registers) -> SimResult<(), String> {
-        let mut instString: String = instruction.to_string();
-        let mut inststr: &str = &instString[..];
-        let mut instbin: usize = 0;
-        match usize::from_str_radix(inststr, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => instbin = f,
+impl Display for ArithSign {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Arithmetic instruction signed")
+    }
+}
+
+/// The one instruction that takes care of all arithmetic instructions
+impl Instruction for ArithSign {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as i32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as i32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.op2 = instruction.get_bits(23..=31) as i32;
         }
-        // let mut instbin = usize::from_str_radix(inststr, 2).unwrap();
-
-        self.dest = (instbin << 13) >> 31;
-
-        self.op2 = (instbin << 23) >> 31;
-
-        self.src_reg = (instbin << 18) >> 31;
-
-        let mut op1String = registers[self.src_reg].to_string();
-        let mut op1str: &str = &op1String[..];
-
-        match usize::from_str_radix(op1str, 2) {
-            Result::Err(e) => return SimResult::Err(e.to_string()),
-            Result::Ok(f) => self.op1 = f,
-        }
-        // self.op1 = usize::from_str_radix(op1str, 2).unwrap();
         
         return SimResult::Wait(0, ());
     }
 
-    /// Execute the binary operation using usize's function checked_add().
-    /// Store value in result field.
     fn execute(&mut self) -> SimResult<(), String> {
-        match self.op1.checked_add(self.op2) {
-            None => return SimResult::Err("Error".to_string()),
-            Some(f) => self.result = f as u32,
+        match self.operation {
+            ArithMode::Add => self.result = self.op1 + self.op2,
+            ArithMode::Sub => self.result = self.op1 - self.op2,
+            ArithMode::Mul => self.result = self.op1 * self.op2,
+            ArithMode::Div => self.result = self.op1 / self.op2,
         }
-        // self.result = self.op1.checked_add(self.op2).unwrap() as u32;
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result as u32;
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct ArithUnsign {
+    mem_addr_mode: AddrMode,
+    dest: usize,
+    operation: ArithMode,
+    op1: u32,
+    op2: u32,
+    result: u32,
+}
+
+impl ArithUnsign {
+    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> ArithUnsign {
+        ArithUnsign{
+            mem_addr_mode: mem_addr_mode,
+            operation: operation,
+            dest: 0,
+            op1: 0,
+            op2: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for ArithUnsign {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Arithmetic instruction unsigned")
+    }
+}
+
+/// The one instruction that takes care of all arithmetic instructions
+impl Instruction for ArithUnsign {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.op2 = instruction.get_bits(23..=31) as u32;
+        }
+        
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        match self.operation {
+            ArithMode::Add => self.result = self.op1 + self.op2,
+            ArithMode::Sub => self.result = self.op1 - self.op2,
+            ArithMode::Mul => self.result = self.op1 * self.op2,
+            ArithMode::Div => self.result = self.op1 / self.op2,
+        }
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result as u32;
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct Comp {
+    signed_or_unsigned: bool,
+    op1: u32,
+    op2: u32,
+}
+
+impl Comp {
+    pub fn new(s_or_u: bool) -> Comp {
+        Comp{
+            signed_or_unsigned: s_or_u,
+            op1: 0,
+            op2: 0,
+        }
+    }
+}
+
+impl Display for Comp {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Comp")
+    }
+}
+
+impl Instruction for Comp {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.op1 = registers[instruction.get_bits(13..=17) as usize] as u32;
+
+        self.op2 = registers[instruction.get_bits(18..=22) as usize] as u32;
+        
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        
+        if self.op1 < self.op2 {
+            registers[STS] = 3;
+        } else if self.op1 > self.op2 {
+            registers[STS] = 2;
+        } else {
+            registers[STS] = 1;
+        }
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+
+#[derive(Debug)]
+pub struct AS {
+    mem_addr_mode: AddrMode,
+    direction: bool,
+    dest: usize,
+    op: u32,
+    amount: u32,
+    result: u32,
+}
+
+impl AS {
+    // direction: Left = false, right = true
+    pub fn new(mem_addr_mode: AddrMode, d: bool) -> AS {
+        AS{
+            mem_addr_mode: mem_addr_mode,
+            direction: d,
+            dest: 0,
+            op: 0,
+            amount: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for AS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Arithmetic Shift")
+    }
+}
+
+impl Instruction for AS {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.amount = registers[instruction.get_bits(18..=22) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.amount = (((registers[PC] + 1) as i32) + (instruction.get_bits(18..=31) as i32)) as u32;
+        }
+        
+        self.op = registers[self.dest] as u32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        if self.direction {
+            self.result = self.op << self.amount;
+        } else {
+            self.result = self.op >> self.amount;
+        }
+
         return SimResult::Wait(0, ());
     }
 
@@ -407,10 +797,419 @@ impl Instruction for AddUIImm {
     /// Store the value of the result in the destination register.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         registers[self.dest] = self.result;
+        
         return SimResult::Wait(0, ());
     }
 }
-*/
+
+
+#[derive(Debug)]
+pub struct LS {
+    mem_addr_mode: AddrMode,
+    direction: bool,
+    dest: usize,
+    op: i32,
+    amount: i32,
+    result: i32,
+}
+
+impl LS {
+    // direction: Left = false, right = true
+    pub fn new(mem_addr_mode: AddrMode, d: bool) -> LS {
+        LS{
+            mem_addr_mode: mem_addr_mode,
+            direction: d,
+            dest: 0,
+            op: 0,
+            amount: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for LS {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Logical Shift")
+    }
+}
+
+impl Instruction for LS {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.amount = registers[instruction.get_bits(18..=22) as usize] as i32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.amount = (((registers[PC] + 1) as i32) + (instruction.get_bits(18..=31) as i32)) as i32;
+        }
+        
+        self.op = registers[self.dest] as i32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        if self.direction {
+            self.result = self.op << self.amount;
+        } else {
+            self.result = self.op >> self.amount;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result as u32;
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+
+#[derive(Debug)]
+pub struct ThreeOpLogic {
+    mem_addr_mode: AddrMode,
+    OpType: LogicType,
+    dest: usize,
+    op1: u32,
+    op2: u32,
+    result: u32,
+}
+
+impl ThreeOpLogic {
+    pub fn new(mem_addr_mode: AddrMode, LT: LogicType) -> ThreeOpLogic {
+        ThreeOpLogic{
+            mem_addr_mode: mem_addr_mode,
+            OpType: LT,
+            dest: 0,
+            op1: 0,
+            op2: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for ThreeOpLogic {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "3 Operation Logic")
+    }
+}
+
+impl Instruction for ThreeOpLogic {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.op2 = (((registers[PC] + 1) as i32) + (instruction.get_bits(23..=31) as i32)) as u32;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        match self.OpType {
+            LogicType::And => self.result = self.op1 & self.op2,
+            LogicType::Or => self.result = self.op1 | self.op2,
+            LogicType::Xor => self.result = self.op1 ^ self.op2,
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.result;
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct Not {
+    dest: usize,
+    op: u32,
+    result: u32,
+}
+
+impl Not {
+    pub fn new() -> Not {
+        Not{
+            dest: 0,
+            op: 0,
+            result: 0,
+        }
+    }
+}
+
+impl Display for Not {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Not")
+    }
+}
+
+impl Instruction for Not {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.dest = instruction.get_bits(13..=17) as usize;
+
+        self.op = registers[instruction.get_bits(18..=22) as usize] as u32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Store the value of the result in the destination register and invert it.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = !self.op;
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+// ---------------------------------- Control Instructions ----------------------------------
+
+#[derive(Debug)]
+pub struct Jump {
+    mem_addr_mode: AddrMode,
+    is_sub: bool,
+    condition: u32,
+    addr: u32,
+}
+
+impl Jump {
+    pub fn new(mem_addr_mode: AddrMode, is_sub: bool) -> Jump {
+        Jump{
+            mem_addr_mode: mem_addr_mode,
+            is_sub: is_sub,
+            condition: 0,
+            addr: 0,
+        }
+    }
+}
+
+impl Display for Jump {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Jump")
+    }
+}
+
+impl Instruction for Jump {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.condition = instruction.get_bits(0..=4) as u32;
+
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.addr = registers[instruction.get_bits(10..=14) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.addr = instruction.get_bits(10..=31) as u32;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        if self.condition == registers[STS] {
+            if self.is_sub {
+                registers[LR] = (PC + 1) as u32;
+            } 
+            else if self.mem_addr_mode == AddrMode::RegisterDirect {
+                registers[PC] = self.addr;
+            }
+            else if self.mem_addr_mode == AddrMode::Immediate {
+                registers[PC] += self.addr ;
+            }
+        }
+        
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct SIH {
+    addr: u32,
+}
+
+impl SIH {
+    pub fn new() -> SIH {
+        SIH{
+            addr: 0,
+        }
+    }
+}
+
+impl Display for SIH {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "SIH")
+    }
+}
+
+impl Instruction for SIH {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.addr = instruction.get_bits(10..=14) as u32;
+
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[IHDLR] = self.addr;
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct INT {
+    mem_addr_mode: AddrMode,
+    proceed: bool,
+    code: u32,
+    addr: u32,
+}
+
+impl INT {
+    pub fn new(mem_addr_mode: AddrMode) -> INT {
+        INT{
+            mem_addr_mode: mem_addr_mode,
+            proceed: false,
+            code: 0,
+            addr: 0,
+        }
+    }
+}
+
+impl Display for INT {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Perform Interrupt")
+    }
+}
+
+impl Instruction for INT {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        if self.mem_addr_mode == AddrMode::RegisterDirect {
+            self.code = registers[instruction.get_bits(10..=14) as usize] as u32;
+        } else if self.mem_addr_mode == AddrMode::Immediate {
+            self.code = instruction.get_bits(10..=13) as u32;
+        }
+
+        if registers[STS] != InterruptCodes::NOT_SET as u32 && registers[IHDLR] != InterruptCodes::NOT_SET_INITIAL as u32 {
+            self.proceed = true;
+        }
+
+        return SimResult::Wait(0, ());
+    }
+
+    /// Execute the binary operation using usize's function checked_add().
+    /// Store value in result field.
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        if self.proceed {
+            match memory.set(1111111111, self.code) {
+                SimResult::Err(e) => SimResult::Err(format!("Failed to store interrupt code, value in {}: {}", self.code, e)),
+                SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
+            }
+        }
+        else {return SimResult::Wait(0, ());}
+    }
+
+    /// Store the value of the result in the destination register.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+
+        if self.proceed {
+            self.proceed = true;
+            registers[STS] = InterruptCodes::SET as u32;
+            registers[INTLR] = registers[PC];
+            registers[PC] = registers[IHDLR];
+        }
+
+        return SimResult::Wait(0, ());
+    }
+}
+
+#[derive(Debug)]
+pub struct JOOI {}
+
+impl JOOI {
+    pub fn new() -> JOOI {
+        JOOI{}
+    }
+}
+
+impl Display for JOOI {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Jump out of Interrupt")
+    }
+}
+
+impl Instruction for JOOI {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    fn execute(&mut self) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    /// Skipped, no memory accessing.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        return SimResult::Wait(0, ());
+    }
+
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        if registers[STS] != InterruptCodes::NOT_SET_INITIAL as u32 {
+            registers[STS] = InterruptCodes::NOT_SET as u32;
+            registers[PC] = registers[INTLR];
+        }
+        
+        return SimResult::Wait(0, ());
+    }
+}
+
+// ------------------------------------ Tests ---------------------------------------
 
 #[cfg(test)]
 mod tests {
@@ -499,14 +1298,16 @@ mod tests {
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
         
         let mut regs = Registers::new();
-        let mut store_instruction = Store::new();
+        let mut store_instruction = Store::new(AddrMode::RegisterDirect);
 
         // Pack instruction operands
         // src = 00101 = R5
         // addr = 01000 = R8
         const SRC_REG_IDX: usize = 5;
         const ADDR_REG_IDX: usize = 8;
-        const instruction: u32 = ((SRC_REG_IDX << 9) | (ADDR_REG_IDX << 14)) as u32;
+        let mut instruction: u32 = 0;
+        instruction.set_bits(16..=20, (SRC_REG_IDX as u32).get_bits(0..=4));
+        instruction.set_bits(11..=15, (ADDR_REG_IDX as u32).get_bits(0..=4));
 
         // Setup registers
         const DEST_ADDR: u32 = 34567;
@@ -539,5 +1340,38 @@ mod tests {
         assert_eq!(store_instruction.write_back(&mut regs),
                    SimResult::Wait(0,()), "write_back == expected");
         assert_eq!(regs, expected_wb_regs, "regs == expected");
+    }
+
+    #[test]
+    fn test_move_instruction() {
+        let scenario = Scenario::new();
+
+        let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        
+        let mut regs = Registers::new();
+
+        let mut move_instruction = Move::new();
+
+        const SRC: usize = 4;
+        const DEST: usize = 5;
+        let mut instruction: u32 = 0;
+        instruction.set_bits(16..=20, (SRC as u32).get_bits(0..=4));
+        instruction.set_bits(11..=15, (DEST as u32).get_bits(0..=4));
+
+        const VAL: u32 = 69;
+
+        regs[SRC] = VAL;
+
+        assert_eq!(move_instruction.decode(instruction, &regs), SimResult::Wait(0, ()), "decode() == expected");
+        assert_eq!(move_instruction.value, VAL, "VAL == instr.value");
+        assert_eq!(move_instruction.dest, DEST, "DEST = instr.dest");
+
+        assert_eq!(move_instruction.execute(), SimResult::Wait(0, ()), "execute() == expected");
+        assert_eq!(move_instruction.access_memory(&mut memory), SimResult::Wait(0, ()), "access_memory() == expected");
+        assert_eq!(move_instruction.write_back(&mut regs), SimResult::Wait(0, ()), "write_back() == expected");
+
+        assert_eq!(regs[DEST], VAL);
+
+
     }
 }
