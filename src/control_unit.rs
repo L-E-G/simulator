@@ -23,12 +23,9 @@ pub struct ControlUnit {
 
     /// Memory system.
     pub memory: DRAM,
-<<<<<<< HEAD
-=======
 
     /// Indicates that the processor has loaded the first instruction yet.
     pub first_instruction_loaded: bool,
->>>>>>> master
 
     /// Instruction which resulted from the fetch stage of the pipeline.
     pub fetch_instruction: Option<u32>,
@@ -94,7 +91,8 @@ impl ControlUnit {
         ControlUnit{
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100, "test-data/example-prog.bin"),
+            memory: DRAM::new(100),
+            first_instruction_loaded: false,
             fetch_instruction: None,            
             decode_instruction: None,
             execute_instruction: None,
