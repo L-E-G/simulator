@@ -515,9 +515,9 @@ impl Instruction for Move {
     /// Extract source register that holds the value to move.
     /// Get the value to move and add it to the value field.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[instruction.get_bits(18..=22) as usize];
+        self.value = registers[instruction.get_bits(16..=20) as usize];
 
-        self.dest = instruction.get_bits(13..=17) as usize;
+        self.dest = instruction.get_bits(11..=15) as usize;
 
         return SimResult::Wait(0, ());
     }
@@ -1340,5 +1340,38 @@ mod tests {
         assert_eq!(store_instruction.write_back(&mut regs),
                    SimResult::Wait(0,()), "write_back == expected");
         assert_eq!(regs, expected_wb_regs, "regs == expected");
+    }
+
+    #[test]
+    fn test_move_instruction() {
+        let scenario = Scenario::new();
+
+        let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        
+        let mut regs = Registers::new();
+
+        let mut move_instruction = Move::new();
+
+        const SRC: usize = 4;
+        const DEST: usize = 5;
+        let mut instruction: u32 = 0;
+        instruction.set_bits(16..=20, (SRC as u32).get_bits(0..=4));
+        instruction.set_bits(11..=15, (DEST as u32).get_bits(0..=4));
+
+        const VAL: u32 = 69;
+
+        regs[SRC] = VAL;
+
+        assert_eq!(move_instruction.decode(instruction, &regs), SimResult::Wait(0, ()), "decode() == expected");
+        assert_eq!(move_instruction.value, VAL, "VAL == instr.value");
+        assert_eq!(move_instruction.dest, DEST, "DEST = instr.dest");
+
+        assert_eq!(move_instruction.execute(), SimResult::Wait(0, ()), "execute() == expected");
+        assert_eq!(move_instruction.access_memory(&mut memory), SimResult::Wait(0, ()), "access_memory() == expected");
+        assert_eq!(move_instruction.write_back(&mut regs), SimResult::Wait(0, ()), "write_back() == expected");
+
+        assert_eq!(regs[DEST], VAL);
+
+
     }
 }
