@@ -579,7 +579,7 @@ impl Instruction for ArithSign {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.op2 = registers[instruction.get_bits(23..=27) as usize] as i32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.op2 = (instruction.get_bits(23..=31) as i32;
+            self.op2 = instruction.get_bits(23..=31) as i32;
         }
         
         return SimResult::Wait(0, ());
@@ -618,7 +618,7 @@ pub struct ArithUnsign {
 }
 
 impl ArithUnsign {
-    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> AriArithUnsignthI {
+    pub fn new(mem_addr_mode: AddrMode, operation: ArithMode) -> ArithUnsign {
         ArithUnsign{
             mem_addr_mode: mem_addr_mode,
             operation: operation,
