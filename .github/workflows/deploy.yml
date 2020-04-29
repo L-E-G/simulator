@@ -1,0 +1,46 @@
+name: Deploy
+
+on:
+  push:
+    branches: [ master ]
+
+jobs:
+  Deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout Branch 📥
+      uses: actions/checkout@v2
+
+    - name: Run Rust Tests 🧪
+      run: cargo test --verbose
+
+    - name: Use Node.js 📦
+      uses: actions/setup-node@v1
+      with:
+        node-version: '13.x'
+
+    - name: Install GUI Build Dependencies 📦
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y curl rsync
+        curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh 
+
+    - name: Build GUI 🛠️
+      run: |
+        wasm-pack build --release
+        cd gui
+        npm install
+        npm run prod-build
+        
+    - name: Install SSH Client 🛰️
+      uses: webfactory/ssh-agent@v0.2.0
+      with:
+        ssh-private-key: ${{ secrets.DEPLOY_KEY }}
+      
+    - name: Deploy 🚀
+      uses: JamesIves/github-pages-deploy-action@releases/v3
+      with:
+        SSH: true
+        BRANCH: gh-pages
+        FOLDER: gui/build

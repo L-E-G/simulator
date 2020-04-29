@@ -1,4 +1,5 @@
 use bit_field::BitField;
+use wasm_bindgen::prelude::*;
 
 use std::boxed::Box;
 use std::fmt;
@@ -22,6 +23,12 @@ pub struct ControlUnit {
 
     /// Memory system.
     pub memory: DRAM,
+<<<<<<< HEAD
+=======
+
+    /// Indicates that the processor has loaded the first instruction yet.
+    pub first_instruction_loaded: bool,
+>>>>>>> master
 
     /// Instruction which resulted from the fetch stage of the pipeline.
     pub fetch_instruction: Option<u32>,
@@ -106,6 +113,8 @@ impl ControlUnit {
     /// If Result::Ok is returned the value embedded indicates if the program
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
+        self.first_instruction_loaded = true;
+        
         //  Write back stage
         match &mut self.access_mem_instruction {
             None => self.write_back_instruction = None,
@@ -165,8 +174,8 @@ impl ControlUnit {
                 // Figure out which instruction the bits represent by
                 // looking at the type and operation code.
                 let itype = fetch_inst.get_bits(5..=6) as u32;
-                
-                let icreate: Result<Box<dyn Instruction>, String> = 
+                let icreate: Result<Box<dyn Instruction>, String> =
+                // Match instruction type
                     match InstructionT::match_val(itype) {
                     Some(InstructionT::Memory) => {
                         let iop = fetch_inst.get_bits(7..=9) as u32;
@@ -345,9 +354,15 @@ impl ControlUnit {
         self.registers[PC] += 1;
 
         // Determine if program should continue running
-            Ok(self.decode_instruction.is_some() ||
-               self.fetch_instruction.is_some() ||
-               self.execute_instruction.is_some() ||
-               self.access_mem_instruction.is_some())
+        Ok(self.program_is_running())
+    }
+
+    /// Returns if the program should keep running.
+    pub fn program_is_running(&self) -> bool {
+        !self.first_instruction_loaded ||
+            self.decode_instruction.is_some() ||
+            self.fetch_instruction.is_some() ||
+            self.execute_instruction.is_some() ||
+            self.access_mem_instruction.is_some()
     }
 }

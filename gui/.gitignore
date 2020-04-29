@@ -1,0 +1,14 @@
+# dependencies
+/node_modules
+
+# production
+/build
+
+# OS X
+.DS_Store
+
+# Logs
+*.log
+
+# NPM lock file, use Yarn
+package-lock.json
