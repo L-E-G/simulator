@@ -453,12 +453,12 @@ impl Display for Store {
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[instruction.get_bits(10..=14) as usize] as u32;
+        self.dest_addr = registers[instruction.get_bits(11..=15) as usize] as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.dest_addr = registers[instruction.get_bits(15..=19) as usize];
+            self.value = registers[instruction.get_bits(16..=20) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.dest_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
+            self.value = (((registers[PC] + 1) as i32) + (instruction.get_bits(16..=31) as i32)) as u32;
         }
 
         SimResult::Wait(0, ())
@@ -1298,14 +1298,16 @@ mod tests {
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
         
         let mut regs = Registers::new();
-        let mut store_instruction = Store::new(AddrMode::Immediate);
+        let mut store_instruction = Store::new(AddrMode::RegisterDirect);
 
         // Pack instruction operands
         // src = 00101 = R5
         // addr = 01000 = R8
         const SRC_REG_IDX: usize = 5;
         const ADDR_REG_IDX: usize = 8;
-        const instruction: u32 = ((SRC_REG_IDX << 9) | (ADDR_REG_IDX << 14)) as u32;
+        let mut instruction: u32 = 0;
+        instruction.set_bits(16..=20, (SRC_REG_IDX as u32).get_bits(0..=4));
+        instruction.set_bits(11..=15, (ADDR_REG_IDX as u32).get_bits(0..=4));
 
         // Setup registers
         const DEST_ADDR: u32 = 34567;
