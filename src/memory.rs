@@ -451,9 +451,9 @@ mod tests {
     /// Tests the DRAM.load_from_file method.
     #[test]
     fn test_dram_load_from_file() {
-        let mut dram = DRAM::new(0);
+        let mut dram = DRAM::new(0, "./test-data/dram-test.bin");
 
-        assert_eq!(dram.load_from_file("./test-data/dram-test.bin"), Ok(()));
+        // assert_eq!(dram.load_from_file("./test-data/dram-test.bin"), Ok(()));
 
         let mut expected: HashMap<u32, u32> = HashMap::new();
         for i in 0..16 {

@@ -453,7 +453,7 @@ impl Display for Store {
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[instruction.get_bits(10..=14) as usize];
+        self.value = registers[instruction.get_bits(10..=14) as usize] as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.dest_addr = registers[instruction.get_bits(15..=19) as usize];
@@ -1298,7 +1298,7 @@ mod tests {
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
         
         let mut regs = Registers::new();
-        let mut store_instruction = Store::new();
+        let mut store_instruction = Store::new(AddrMode::Immediate);
 
         // Pack instruction operands
         // src = 00101 = R5
