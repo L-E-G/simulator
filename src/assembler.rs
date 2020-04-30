@@ -61,15 +61,6 @@ fn from_register(token: &str) -> u32 {
     return token.parse::<u32>().unwrap();
 }
 
-fn homemade_split(line: &str) -> Vec<String> {
-    let mut vec = Vec::new();
-    let line_split: Vec<&str> = line.split(" ").collect();
-    for tok in line_split {
-        vec.push(tok.to_string());
-    }
-    return vec
-}
-
 fn to_array(tokens: Vec<&str>) -> [&str; 4] {
     let mut array = [""; 4];
 
@@ -196,8 +187,6 @@ fn main() {
             // let condition, mnemonic = fn_which_extract_condition_codes_from_end_of_mnemonics(token[1]);
             let immediate_idxs = get_immediate_index(tokens);
 
-            let mut template_opt: Option<InstructionTemplate> = None;
-
             let mut inst = InstructionDetails{
                 condition: 0,
                 itype: 0,
@@ -209,7 +198,6 @@ fn main() {
 
             for t in &mnemonics {
                 if tokens[0] == t.mnemonic && t.immediate_idx == immediate_idxs {
-                    // template_opt = Some(t);
 
                     inst.itype = t.itype;
                     inst.operation = t.operationRD;
@@ -249,7 +237,7 @@ fn main() {
     }
     
     for inst in first_pass {
-        
+
     } 
 
 }
