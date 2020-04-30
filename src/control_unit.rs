@@ -262,10 +262,8 @@ impl ControlUnit {
                             Some(ALUOp::DivSII) => Ok(Box::new(
                                 ArithSign::new(AddrMode::Immediate, ArithMode::Div))),
                             // ---- Comp ----
-                            Some(ALUOp::CompUI) => Ok(Box::new(
-                                Comp::new(false))),
-                            Some(ALUOp::CompSI) => Ok(Box::new(
-                                Comp::new(true))),
+                            Some(ALUOp::Comp) => Ok(Box::new(
+                                Comp::new())),
                             // ---- Arithmetic Shift ----
                             Some(ALUOp::ASLRD) => Ok(Box::new(
                                 AS::new(AddrMode::RegisterDirect, false))),

@@ -215,7 +215,7 @@ pub enum ALUOp {
     MulUIRD, MulUII, MulSIRD, MulSII, 
     DivUIRD, DivUII, DivSIRD, DivSII,
     Move, 
-    CompUI, CompSI, 
+    Comp,
     ASLRD, ASLI, ASRRD, ASRI,
     LSLRD, LSLI, LSRRD, LSRI,
     AndRD, AndI,
@@ -244,8 +244,7 @@ impl ALUOp {
             ALUOp::DivSIRD => 14,
             ALUOp::DivSII => 15,
             ALUOp::Move => 16,
-            ALUOp::CompUI => 17,
-            ALUOp::CompSI => 18,
+            ALUOp::Comp => 17,
             ALUOp::ASLRD => 19,
             ALUOp::ASLI => 20,
             ALUOp::ASRRD => 21,
@@ -284,8 +283,7 @@ impl ALUOp {
             14 => Some(ALUOp::DivSIRD),
             15 => Some(ALUOp::DivSII),
             16 => Some(ALUOp::Move),
-            17 => Some(ALUOp::CompUI),
-            18 => Some(ALUOp::CompSI),
+            17 => Some(ALUOp::Comp),
             19 => Some(ALUOp::ASLRD),
             20 => Some(ALUOp::ASLI),
             21 => Some(ALUOp::ASRRD),
@@ -677,15 +675,13 @@ impl Instruction for ArithUnsign {
 
 #[derive(Debug)]
 pub struct Comp {
-    signed_or_unsigned: bool,
     op1: u32,
     op2: u32,
 }
 
 impl Comp {
-    pub fn new(s_or_u: bool) -> Comp {
+    pub fn new() -> Comp {
         Comp{
-            signed_or_unsigned: s_or_u,
             op1: 0,
             op2: 0,
         }
