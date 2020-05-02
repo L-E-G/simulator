@@ -311,6 +311,7 @@ pub enum ControlOp {
     Sih,
     IntRD, IntI, 
     Ijmp,
+    Halt,
 }
 
 impl ControlOp {
@@ -325,6 +326,8 @@ impl ControlOp {
             ControlOp::IntRD => 5,
             ControlOp::IntI => 6,
             ControlOp::Ijmp => 7,
+            ControlOp::Halt => 8,
+
         }
     }
 
@@ -374,6 +377,7 @@ impl Instruction for Halt {
     }
 
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        panic!("The program has ended");
         return SimResult::Wait(0, ());
     }
 }

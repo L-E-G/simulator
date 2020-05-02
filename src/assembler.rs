@@ -9,7 +9,8 @@ use std::io::{Read,Write,BufRead,BufReader,LineWriter};
 mod instructions;
 mod memory;
 mod result;
-use instructions::{InstructionT,ALUOp};
+use instructions::{InstructionT,ALUOp,MemoryOp,ControlOp};
+use memory::{Registers,Memory};
 
 /// A template for an instructions bit pattern.
 struct InstructionTemplate {
@@ -41,13 +42,16 @@ struct InstructionDetails {
     imm_idx: u32,
     operand1: u32,
     operand2: u32,
-    operand3: u32
+    operand3: u32,
 }
 
 /// Number of bits used in the operation field of ALU instructions.
 const NUM_ALU_OP_BITS: u32 = 6;
+const NUM_MEMORY_OP_BITS: u32 = 3;
+const NUM_CONTROL_OP_BITS: u32 = 1;
+const NUM_GRAPHICS_OP_BITS: u32 = 2;
 /// Indicates there is no immediate in instruction.
-const NO_IMMEDIATE: u32 = 111;
+const NO_IMMEDIATE: u32 = 1111;
 /// Used in the InstructionDetails struct to indicate that the operand field is not set.
 /// Used to tell how many operands there are in the instruction
 const NOT_SET: u32 = 11111111;
@@ -55,13 +59,16 @@ const NOT_SET: u32 = 11111111;
 const SIZE_OF_REG: u32 = 5;
 
 // Gets the indexes of where the immediate value are
-fn get_immediate_index(tokens: [&str; 4]) -> u32 {
+fn has_immediate(tokens: [&str; 4]) -> bool {
+    
     for i in 0..tokens.len() {
-        if tokens[i][1..2] == "x".to_string() || tokens[i][1..2] == "b".to_string() || tokens[i][1..2] == "d".to_string() {
-            return i as u32;
+        if tokens[i] != "" {   // Need to check if there in anything in that spot in the array
+            if tokens[i][1..2] == "x".to_string() || tokens[i][1..2] == "b".to_string() || tokens[i][1..2] == "d".to_string() {
+                return true;
+            }
         }
     }
-    return NO_IMMEDIATE
+    return false
 }
 
 // gets the immediate value
@@ -71,7 +78,7 @@ fn from_immediate(token: &str) -> u32 {
 
 // gets the reg address
 fn from_register(token: &str) -> u32 {
-    return token.parse::<u32>().unwrap();
+    return token[1..].parse::<u32>().unwrap();
 }
 
 // converts a vector into an array, this is for borrow issues with vectors
@@ -89,6 +96,22 @@ fn to_array(tokens: Vec<&str>) -> [&str; 4] {
 fn main() {
     // Define instruction mnemonics
     let mnemonics = vec![
+        InstructionTemplate{
+            mnemonic: "HALT".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_CONTROL_OP_BITS,
+            operationI: ControlOp::Halt.value(),
+            operationRD: NO_IMMEDIATE,
+            immediate_idx: NO_IMMEDIATE,
+        },
+        InstructionTemplate{
+            mnemonic: "STR".to_string(),
+            itype: InstructionT::Memory.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: MemoryOp::StoreI.value(),
+            operationRD: MemoryOp::StoreRD.value(),
+            immediate_idx: 2,
+        },
         InstructionTemplate{
             mnemonic: "ADDU".to_string(),
             itype: InstructionT::ALU.value(),
@@ -152,32 +175,32 @@ fn main() {
     let mut first_pass = Vec::new();
     
     // Parse command line arguments
-    let app = App::new("LEG assembler")
-        .about("Converts LEG assembly into the LEG binary format")
-        .arg(Arg::with_name("IN_ASSEMBLY")
-             .short("i")
-             .long("in")
-             .help("Input LEG assembly file")
-             .takes_value(true)
-             .required(true))
-        .arg(Arg::with_name("OUT_BINARY")
-             .short("o")
-             .long("out")
-             .help("Output LEG binary file")
-             .takes_value(true)
-             .required(true))
-        .get_matches();
+    // let app = App::new("LEG assembler")
+    //     .about("Converts LEG assembly into the LEG binary format")
+    //     .arg(Arg::with_name("IN_ASSEMBLY")
+    //          .short("i")
+    //          .long("in")
+    //          .help("Input LEG assembly file")
+    //          .takes_value(true)
+    //          .required(true))
+    //     .arg(Arg::with_name("OUT_BINARY")
+    //          .short("o")
+    //          .long("out")
+    //          .help("Output LEG binary file")
+    //          .takes_value(true)
+    //          .required(true))
+    //     .get_matches();
 
-    let in_assembly_path = app.value_of("IN_ASSEMBLY").unwrap();
-    let out_binary_path = app.value_of("OUT_BINARY").unwrap();
+    // let in_assembly_path = app.value_of("IN_ASSEMBLY").unwrap();
+    // let out_binary_path = app.value_of("OUT_BINARY").unwrap();
 
     // Read assembly file
-    let in_assembly_f = match File::open(in_assembly_path) {
+    let in_assembly_f = match File::open("test-data/assembly") {
         Err(e) => panic!("Failed to open input assembly file: {}", e),
         Ok(f) => f,
     };
     let in_assembly_buf = BufReader::new(in_assembly_f);
-
+    println!("Rob");
     let mut line_num = 1;
     for in_line in in_assembly_buf.lines() {
         let line = match in_line {
@@ -197,14 +220,17 @@ fn main() {
                 .expect(&format!("No 0th character found for non-empty line {}",line_num));
 
             // Check id valid line
-            if first_char != ' ' && first_char != '\t' {
+            if first_char == ' ' && first_char == '\t' {
                 panic!("Invalid instruction");
             }
 
+            // TODO: Be able to pull condition codes from instructions
             // let condition, mnemonic = fn_which_extract_condition_codes_from_end_of_mnemonics(token[1]);
 
+            
             // Get immediate indexes if there are any
-            let immediate_idxs = get_immediate_index(tokens);
+            let has_immediate = has_immediate(tokens);
+            
 
             // Create instruction to be assigned later
             let mut inst = InstructionDetails{
@@ -227,10 +253,11 @@ fn main() {
                     inst.operation = t.operationRD;
 
                     // Loop though tokens, set remaining values
-                    let mut operand_index = 1;
-                    for i in 0..tokens.len() {
-                        // Enter is immediate
-                        if i as u32 == immediate_idxs {
+                    let mut operand_index: u32 = 1;
+                    for i in 1..tokens.len() {
+                        // Enter if immediate
+                        if i as u32 == t.immediate_idx && has_immediate {
+                            
                             inst.imm_idx = t.immediate_idx;
                             match operand_index {
                                 1 => inst.operand1 = from_immediate(tokens[i]),
@@ -241,25 +268,27 @@ fn main() {
                             operand_index += 1;
                             inst.operation = t.operationI;
                         } else {
+                            
                             match operand_index {
-                                1 => inst.operand1 = from_register(tokens[i]),
+                                
+                                1 => inst.operand1 = {
+                                    
+                                    from_register(tokens[i])
+                                },
                                 2 => inst.operand2 = from_register(tokens[i]),
                                 3 => inst.operand3 = from_register(tokens[i]),
                                 _ => panic!("Failed to assign operand reg direct value"),
                             }
+                            
                             operand_index += 1;
                         }
+                        
                     }
                 }
             }
 
-            // Push to first vector
+            // Push to first pass vector
             first_pass.push(inst)
-
-            // TODO: Store symbol in symbol table
-            // TODO:  Find mnemonic in mnemonic table which matches mnemonic on line
-            // TODO: Create a structure which represents contents of line
-            // TODO: Build this structure for current line
         }
         line_num += 1;
     }
@@ -275,9 +304,11 @@ fn main() {
     //     operand3: 0,
     // };
 
+    //Second pass
     let mut index = 0;
     for inst in first_pass {
         // Create file
+        
         let file = match File::create("test-data/instructions.bin") {
             Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
             Ok(f) => f,
@@ -297,27 +328,42 @@ fn main() {
         instruction.set_bits(inst_pos as usize..=(inst_pos+1) as usize, 
             inst.itype.get_bits(0..=1));
         inst_pos += 2;
-
+        
         // Set operation code
-        // TODO: fix this to that it is not just doing the ALU bits
-        instruction.set_bits(inst_pos as usize..=(inst_pos + NUM_ALU_OP_BITS) as usize, 
-            inst.operation.get_bits(0..=NUM_ALU_OP_BITS as usize));
-        inst_pos += NUM_ALU_OP_BITS+1;
+        if InstructionT::ALU.value() == inst.itype {
+            instruction.set_bits(inst_pos as usize..=(inst_pos + NUM_ALU_OP_BITS) as usize, 
+                inst.operation.get_bits(0..=NUM_ALU_OP_BITS as usize));
+            inst_pos += NUM_ALU_OP_BITS;
+        } else if InstructionT::Memory.value() == inst.itype {
+            instruction.set_bits(inst_pos as usize..=(inst_pos + NUM_MEMORY_OP_BITS) as usize, 
+                inst.operation.get_bits(0..=NUM_MEMORY_OP_BITS as usize));
+            inst_pos += NUM_MEMORY_OP_BITS;
+        } else if InstructionT::Control.value() == inst.itype {
+            instruction.set_bits(inst_pos as usize..=(inst_pos + NUM_CONTROL_OP_BITS) as usize, 
+                inst.operation.get_bits(0..=NUM_CONTROL_OP_BITS as usize));
+            inst_pos += NUM_CONTROL_OP_BITS;
+        } else if InstructionT::Graphics.value() == inst.itype {
+            instruction.set_bits(inst_pos as usize..=(inst_pos + NUM_GRAPHICS_OP_BITS) as usize, 
+                inst.operation.get_bits(0..=NUM_GRAPHICS_OP_BITS as usize));
+            inst_pos += NUM_GRAPHICS_OP_BITS;
+        }
+        
 
         // Set first operand
         instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
             inst.operand1.get_bits(0..=SIZE_OF_REG as usize));
-        inst_pos += SIZE_OF_REG+1;
+        inst_pos += SIZE_OF_REG;
 
         //Set second operand (if applicable)
         if inst.operand2 != NOT_SET {
             if index == inst.imm_idx {
                 instruction.set_bits(inst_pos as usize..=(32 - inst_pos) as usize, 
                     inst.operand2.get_bits(0..=(32 - inst_pos) as usize));
+            }else {
+                instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
+                    inst.operand2.get_bits(0..=SIZE_OF_REG as usize));
+                inst_pos += SIZE_OF_REG;
             }
-            instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
-                inst.operand2.get_bits(0..=SIZE_OF_REG as usize));
-            inst_pos += SIZE_OF_REG+1;
         }
 
         // Set third operand (if applicable)
@@ -328,7 +374,6 @@ fn main() {
             }
             instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
                 inst.operand3.get_bits(0..=SIZE_OF_REG as usize));
-            inst_pos += SIZE_OF_REG+1;
         }
 
         // Convert to [u8] for .write_all()
@@ -338,10 +383,28 @@ fn main() {
         let b4: u8 = (instruction & 0xff) as u8;
         let write_val: [u8;4] = [b1,b2,b3,b4];
 
-        // Write to bin file
+        // Write to bin file, this takes an &[u8] value
         writer.write_all(&write_val);
+        writer.write_all(format!("\n").as_bytes());
 
         index += 1;
     } 
 
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use mockers::Scenario;
+    
+    #[test]
+    fn test_assembler() {
+        // let scenario = Scenario::new();
+
+        // let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        
+        // let mut regs = Registers::new();
+
+        main();
+    }
 }
