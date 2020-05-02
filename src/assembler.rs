@@ -100,8 +100,8 @@ fn main() {
             mnemonic: "HALT".to_string(),
             itype: InstructionT::Control.value(),
             num_operation_bits: NUM_CONTROL_OP_BITS,
-            operationI: ControlOp::Halt.value(),
-            operationRD: NO_IMMEDIATE,
+            operationI: NO_IMMEDIATE,
+            operationRD: ControlOp::Halt.value(),
             immediate_idx: NO_IMMEDIATE,
         },
         InstructionTemplate{
@@ -200,7 +200,7 @@ fn main() {
         Ok(f) => f,
     };
     let in_assembly_buf = BufReader::new(in_assembly_f);
-    println!("Rob");
+
     let mut line_num = 1;
     for in_line in in_assembly_buf.lines() {
         let line = match in_line {
@@ -230,7 +230,6 @@ fn main() {
             
             // Get immediate indexes if there are any
             let has_immediate = has_immediate(tokens);
-            
 
             // Create instruction to be assigned later
             let mut inst = InstructionDetails{
@@ -252,7 +251,13 @@ fn main() {
                     inst.itype = t.itype;
                     inst.operation = t.operationRD;
 
-                    // Loop though tokens, set remaining values
+                    // Check if there are no operands
+                    if tokens[1] == "" {
+                        println!("Rob");
+                        continue;
+                    }
+                    
+                    // Loop though operands, set remaining values
                     let mut operand_index: u32 = 1;
                     for i in 1..tokens.len() {
                         // Enter if immediate
@@ -270,11 +275,7 @@ fn main() {
                         } else {
                             
                             match operand_index {
-                                
-                                1 => inst.operand1 = {
-                                    
-                                    from_register(tokens[i])
-                                },
+                                1 => inst.operand1 = from_register(tokens[i]),
                                 2 => inst.operand2 = from_register(tokens[i]),
                                 3 => inst.operand3 = from_register(tokens[i]),
                                 _ => panic!("Failed to assign operand reg direct value"),
@@ -284,11 +285,12 @@ fn main() {
                         }
                         
                     }
+                    break;
                 }
             }
 
             // Push to first pass vector
-            first_pass.push(inst)
+            first_pass.push(inst);
         }
         line_num += 1;
     }
@@ -304,17 +306,16 @@ fn main() {
     //     operand3: 0,
     // };
 
+    let mut file = match File::create("test-data/instructions.bin") {
+        Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
+        Ok(f) => f,
+    };
+    let mut writer = LineWriter::new(file);
+
     //Second pass
     let mut index = 0;
     for inst in first_pass {
-        // Create file
-        
-        let file = match File::create("test-data/instructions.bin") {
-            Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
-            Ok(f) => f,
-        };
-
-        let mut writer = LineWriter::new(file);
+        let mut fc_idx = 0;
 
         let mut inst_pos: u32 = 0;
         let mut instruction: u32 = 0;
@@ -347,12 +348,18 @@ fn main() {
                 inst.operation.get_bits(0..=NUM_GRAPHICS_OP_BITS as usize));
             inst_pos += NUM_GRAPHICS_OP_BITS;
         }
-        
 
         // Set first operand
-        instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
-            inst.operand1.get_bits(0..=SIZE_OF_REG as usize));
-        inst_pos += SIZE_OF_REG;
+        if inst.operand1 != NOT_SET {
+            if index == inst.imm_idx {
+                instruction.set_bits(inst_pos as usize..=(32 - inst_pos) as usize, 
+                    inst.operand1.get_bits(0..=(32 - inst_pos) as usize));
+            }else {
+                instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
+                    inst.operand1.get_bits(0..=SIZE_OF_REG as usize));
+                inst_pos += SIZE_OF_REG;
+            }
+        }
 
         //Set second operand (if applicable)
         if inst.operand2 != NOT_SET {
@@ -384,12 +391,13 @@ fn main() {
         let write_val: [u8;4] = [b1,b2,b3,b4];
 
         // Write to bin file, this takes an &[u8] value
-        writer.write_all(&write_val);
-        writer.write_all(format!("\n").as_bytes());
+        writer.write(&write_val);
 
         index += 1;
     } 
-
+    
+    
+    // writer.write_all(&file_contents);
 }
 
 #[cfg(test)]

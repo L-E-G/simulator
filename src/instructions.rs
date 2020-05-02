@@ -377,7 +377,6 @@ impl Instruction for Halt {
     }
 
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        panic!("The program has ended");
         return SimResult::Wait(0, ());
     }
 }
