@@ -7,10 +7,10 @@ use std::fmt;
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,
-    MemoryOp,AddrMode,Load,Store,
+    MemoryOp,AddrMode,Load,Store,Push,Pop,
     ArithMode,ALUOp,Move,ArithSign,ArithUnsign,
     Comp,AS,LS,LogicType,ThreeOpLogic,Not,
-    ControlOp,Jump,SIH,INT,JOOI,
+    ControlOp,Jump,SIH,INT,RFI,
 };
 
 /// Responsible for running instructions.
@@ -187,6 +187,10 @@ impl ControlUnit {
                                 Store::new(AddrMode::RegisterDirect))),
                             Some(MemoryOp::StoreI) => Ok(Box::new(
                                 Store::new(AddrMode::Immediate))),
+                            Some(MemoryOp::Push) => Ok(Box::new(
+                                Push::new())),
+                            Some(MemoryOp::Pop) => Ok(Box::new(
+                                Pop::new())),
                             _ => Err(format!("Invalid operation code {} for \
                                               mememory type instruction", iop)),
                         }
@@ -209,8 +213,8 @@ impl ControlUnit {
                                 INT::new(AddrMode::RegisterDirect))),
                             Some(ControlOp::IntI) => Ok(Box::new(
                                 INT::new(AddrMode::Immediate))),
-                            Some(ControlOp::Ijmp) => Ok(Box::new(
-                                JOOI::new())),
+                            Some(ControlOp::RFI) => Ok(Box::new(
+                                RFI::new())),
                             _ => Err(format!("Invalid operation code {} for \
                                             Control type instruction", iop)),
                         }

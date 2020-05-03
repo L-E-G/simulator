@@ -4,7 +4,7 @@ use std::fmt;
 use std::fmt::{Debug,Display};
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR,INTLR};
+use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR,INTLR,SP};
 
 /// Defines operations which a single instruction must perform while it is in
 /// the pipeline.
@@ -310,7 +310,7 @@ pub enum ControlOp {
     JmpSRD, JmpSI,
     Sih,
     IntRD, IntI, 
-    Ijmp,
+    RFI,
     Halt,
 }
 
@@ -325,7 +325,7 @@ impl ControlOp {
             ControlOp::Sih => 4,
             ControlOp::IntRD => 5,
             ControlOp::IntI => 6,
-            ControlOp::Ijmp => 7,
+            ControlOp::RFI => 7,
             ControlOp::Halt => 8,
 
         }
@@ -341,7 +341,7 @@ impl ControlOp {
             4 => Some(ControlOp::Sih),
             5 => Some(ControlOp::IntRD),
             6 => Some(ControlOp::IntI),
-            7 => Some(ControlOp::Ijmp),
+            7 => Some(ControlOp::RFI),
             _ => None,
         }
     }
@@ -506,7 +506,6 @@ impl Instruction for Store {
 
     /// Set address in memory to value.
     fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
-        println!("set({}, {}", self.dest_addr, self.value);
         match memory.set(self.dest_addr, self.value) {
             SimResult::Err(e) => SimResult::Err(
                 format!("Failed to store value in {}: {}", self.dest_addr, e)),
@@ -516,6 +515,111 @@ impl Instruction for Store {
 
     /// No write back stage.
     fn write_back(&mut self, _registers: &mut Registers) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+}
+
+#[derive(Debug)]
+pub struct Push {
+    addr: u32,
+    value: u32,
+}
+
+impl Push {
+    pub fn new() -> Push {
+        Push{
+            addr: 0,
+            value: 0,
+        }
+    }
+}
+
+impl Display for Push {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Push")
+    }
+}
+
+impl Instruction for Push {
+    /// Extract operands and retrieve value to save in memory from registers.
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.addr = registers[instruction.get_bits(11..=15) as usize] as u32;
+        self.value = registers[SP] - 1;
+        SimResult::Wait(0, ())
+    }
+
+    /// No execution stage.
+    fn execute(&mut self) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+
+    /// Set address in memory to value.
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        match memory.set(self.addr, self.value) {
+            SimResult::Err(e) => SimResult::Err(
+                format!("Failed to Push value in {}: {}", self.addr, e)),
+            SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
+        }
+    }
+
+    /// No write back stage.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[SP] -= 1;
+        SimResult::Wait(0, ())
+    }
+}
+
+#[derive(Debug)]
+pub struct Pop {
+    dest: usize,
+    addr: u32,
+    value: u32,
+}
+
+impl Pop {
+    pub fn new() -> Pop {
+        Pop{
+            dest: 0,
+            addr: 0,
+            value: 0,
+        }
+    }
+}
+
+impl Display for Pop {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "Pop")
+    }
+}
+
+impl Instruction for Pop {
+    fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
+        self.dest = instruction.get_bits(11..=15) as usize;
+        self.addr = registers[SP];
+        SimResult::Wait(0, ())
+    }
+
+    /// No execution stage.
+    fn execute(&mut self) -> SimResult<(), String> {
+        SimResult::Wait(0, ())
+    }
+
+    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+        match memory.get(self.addr) {
+            SimResult::Err(e) => SimResult::Err(
+                format!("failed to Pop {}: {}",
+                        self.addr, e)),
+            SimResult::Wait(wait, val) => {
+                self.value = val;
+                SimResult::Wait(wait, ())
+            },
+        }
+    }
+
+    /// No write back stage.
+    fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[self.dest] = self.value;
+        registers[SP] += 1;
         SimResult::Wait(0, ())
     }
 }
@@ -804,7 +908,7 @@ impl Instruction for AS {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.amount = registers[instruction.get_bits(19..=23) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.amount = (((registers[PC] + 1) as i32) + (instruction.get_bits(19..=31) as i32)) as u32;
+            self.amount = instruction.get_bits(19..=31) as u32;
         }
         
         self.op = registers[self.dest] as u32;
@@ -874,7 +978,7 @@ impl Instruction for LS {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.amount = registers[instruction.get_bits(19..=23) as usize] as i32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.amount = (((registers[PC] + 1) as i32) + (instruction.get_bits(19..=31) as i32)) as i32;
+            self.amount = instruction.get_bits(19..=31) as u32;
         }
         
         self.op = registers[self.dest] as i32;
@@ -945,7 +1049,7 @@ impl Instruction for ThreeOpLogic {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.op2 = registers[instruction.get_bits(24..=28) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.op2 = (((registers[PC] + 1) as i32) + (instruction.get_bits(24..=31) as i32)) as u32;
+            self.op2 = instruction.get_bits(24..=31) as u32;
         }
 
         return SimResult::Wait(0, ());
@@ -1204,21 +1308,21 @@ impl Instruction for INT {
 }
 
 #[derive(Debug)]
-pub struct JOOI {}
+pub struct RFI {}
 
-impl JOOI {
-    pub fn new() -> JOOI {
-        JOOI{}
+impl RFI {
+    pub fn new() -> RFI {
+        RFI{}
     }
 }
 
-impl Display for JOOI {
+impl Display for RFI {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(f, "Jump out of Interrupt")
     }
 }
 
-impl Instruction for JOOI {
+impl Instruction for RFI {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }

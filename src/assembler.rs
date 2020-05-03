@@ -93,6 +93,14 @@ fn to_array(tokens: Vec<&str>) -> [&str; 4] {
     return array;
 }
 
+fn tokens_length(tokens: [&str; 4]) -> u32 {
+    let mut length = 0;
+    for i in 0..4 {
+        if tokens[i] != "" {length += 1;}
+    }
+    return length;
+}
+
 fn main() {
     // Define instruction mnemonics
     let mnemonics = vec![
@@ -113,6 +121,54 @@ fn main() {
             immediate_idx: 2,
         },
         InstructionTemplate{
+            mnemonic: "LDR".to_string(),
+            itype: InstructionT::Memory.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: MemoryOp::LoadI.value(),
+            operationRD: MemoryOp::LoadRD.value(),
+            immediate_idx: 2,
+        },
+        InstructionTemplate{
+            mnemonic: "PUSH".to_string(),
+            itype: InstructionT::Memory.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: NO_IMMEDIATE,
+            operationRD: MemoryOp::Push.value(),
+            immediate_idx: NO_IMMEDIATE,
+        },
+        InstructionTemplate{
+            mnemonic: "POP".to_string(),
+            itype: InstructionT::Memory.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: NO_IMMEDIATE,
+            operationRD: MemoryOp::Pop.value(),
+            immediate_idx: NO_IMMEDIATE,
+        },
+        InstructionTemplate{
+            mnemonic: "JMP".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: ControlOp::JmpI.value(),
+            operationRD: ControlOp::JmpRD.value(),
+            immediate_idx: 1,
+        },
+        InstructionTemplate{
+            mnemonic: "JMPS".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: ControlOp::JmpSI.value(),
+            operationRD: ControlOp::JmpSRD.value(),
+            immediate_idx: 1,
+        },
+        InstructionTemplate{
+            mnemonic: "JMPI".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_MEMORY_OP_BITS,
+            operationI: NO_IMMEDIATE,
+            operationRD: ControlOp::RFI.value(),
+            immediate_idx: NO_IMMEDIATE,
+        },
+        InstructionTemplate{
             mnemonic: "ADDU".to_string(),
             itype: InstructionT::ALU.value(),
             num_operation_bits: NUM_ALU_OP_BITS,
@@ -128,48 +184,126 @@ fn main() {
             operationRD: ALUOp::AddSIRD.value(),
             immediate_idx: 3,
         },
-        // InstructionTemplate{
-        //     mnemonic: "SUBU",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::SubUIRD,
-        // },
-        // InstructionTemplate{
-        //     mnemonic: "SUBS",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::SubSIRD,
-        // },
-        // InstructionTemplate{
-        //     mnemonic: "MULU",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::MulUIRD,
-        // },
-        // InstructionTemplate{
-        //     mnemonic: "MULS",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::MulUII,
-        // },
-        // InstructionTemplate{
-        //     mnemonic: "MV",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::Move,
-        // },
-        // InstructionTemplate{
-        //     mnemonic: "CMP",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::CompUI,
-        // },
-        // InstructionTemplate{
-        //     mnemonic: "ASL",
-        //     itype: InstructionT::ALU.value(),
-        //     num_operation_bits: NUM_ALU_OP_BITS,
-        //     operation: ALUOp::CompUI,
-        // },
+        InstructionTemplate{
+            mnemonic: "SUBU".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::SubUII.value(),
+            operationRD: ALUOp::SubUIRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "SUBS".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::SubSII.value(),
+            operationRD: ALUOp::SubSIRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "MULU".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::MulUII.value(),
+            operationRD: ALUOp::MulUIRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "MULS".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::MulSII.value(),
+            operationRD: ALUOp::MulSIRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "DIVU".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::DivUII.value(),
+            operationRD: ALUOp::DivUIRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "DIVS".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::DivSII.value(),
+            operationRD: ALUOp::DivSIRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "MV".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: NO_IMMEDIATE,
+            operationRD: ALUOp::Move.value(),
+            immediate_idx: NO_IMMEDIATE,
+        },
+        InstructionTemplate{
+            mnemonic: "CMP".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: NO_IMMEDIATE,
+            operationRD: ALUOp::Comp.value(),
+            immediate_idx: NO_IMMEDIATE,
+        },
+        InstructionTemplate{
+            mnemonic: "ASL".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::ASLI.value(),
+            operationRD: ALUOp::ASLRD.value(),
+            immediate_idx: 2,
+        },
+        InstructionTemplate{
+            mnemonic: "ASR".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::ASRI.value(),
+            operationRD: ALUOp::ASRRD.value(),
+            immediate_idx: 2,
+        },
+        InstructionTemplate{
+            mnemonic: "LSL".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::LSLI.value(),
+            operationRD: ALUOp::LSRRD.value(),
+            immediate_idx: 2,
+        },
+        InstructionTemplate{
+            mnemonic: "AND".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::AndI.value(),
+            operationRD: ALUOp::AndRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "OR".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::OrI.value(),
+            operationRD: ALUOp::OrRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "XOR".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: ALUOp::XorI.value(),
+            operationRD: ALUOp::XorRD.value(),
+            immediate_idx: 3,
+        },
+        InstructionTemplate{
+            mnemonic: "NOT".to_string(),
+            itype: InstructionT::ALU.value(),
+            num_operation_bits: NUM_ALU_OP_BITS,
+            operationI: NO_IMMEDIATE,
+            operationRD: ALUOp::Not.value(),
+            immediate_idx: NO_IMMEDIATE,
+        },
     ];
     
     let mut first_pass = Vec::new();
@@ -214,6 +348,7 @@ fn main() {
 
             // Convert to array for borrow issues, can't borrow with vectors
             let tokens = to_array(tokens_vec);
+            let tokens_len: u32 = tokens_length(tokens);
             
             // get first character
             let first_char = line.chars().nth(0)
@@ -252,35 +387,31 @@ fn main() {
                     inst.operation = t.operationRD;
 
                     // Check if there are no operands
-                    if tokens[1] == "" {
-                        println!("Rob");
-                        continue;
+                    if tokens_len == 1 {
+                        break;
                     }
                     
                     // Loop though operands, set remaining values
                     let mut operand_index: u32 = 1;
-                    for i in 1..tokens.len() {
+                    for i in 1..tokens_len {
                         // Enter if immediate
-                        if i as u32 == t.immediate_idx && has_immediate {
-                            
+                        if i == t.immediate_idx && has_immediate {
                             inst.imm_idx = t.immediate_idx;
+                            inst.operation = t.operationI;
                             match operand_index {
-                                1 => inst.operand1 = from_immediate(tokens[i]),
-                                2 => inst.operand2 = from_immediate(tokens[i]),
-                                3 => inst.operand3 = from_immediate(tokens[i]),
+                                1 => inst.operand1 = from_immediate(tokens[i as usize]),
+                                2 => inst.operand2 = from_immediate(tokens[i as usize]),
+                                3 => inst.operand3 = from_immediate(tokens[i as usize]),
                                 _ => panic!("Failed to assign operand immediate value"),
                             }
                             operand_index += 1;
-                            inst.operation = t.operationI;
                         } else {
-                            
                             match operand_index {
-                                1 => inst.operand1 = from_register(tokens[i]),
-                                2 => inst.operand2 = from_register(tokens[i]),
-                                3 => inst.operand3 = from_register(tokens[i]),
+                                1 => inst.operand1 = from_register(tokens[i as usize]),
+                                2 => inst.operand2 = from_register(tokens[i as usize]),
+                                3 => inst.operand3 = from_register(tokens[i as usize]),
                                 _ => panic!("Failed to assign operand reg direct value"),
                             }
-                            
                             operand_index += 1;
                         }
                         
