@@ -1,3 +1,4 @@
+extern crate clap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::convert::{IntoWasmAbi,FromWasmAbi,WasmSlice};
 use wasm_bindgen::JsValue;
@@ -16,9 +17,11 @@ mod result;
 mod memory;
 mod instructions;
 mod control_unit;
+mod assembler;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
 use crate::memory::{Memory,InspectableMemory};
+use crate::assembler::assembler;
 
 /// Represents the state of stages in the pipeline.
 /// Values are names of the instruction in each stage.
@@ -85,6 +88,10 @@ impl Simulator {
             control_unit: ControlUnit::new(),
             pipeline_statuses: vec![],
         }
+    }
+
+    fn use_assembler(file: &str) -> JsValue {
+        JsValue::from_serde(&assembler(file)).unwrap()
     }
 
     /// Returns addresses and values in DRAM. First returned value is a list of
@@ -154,3 +161,5 @@ impl Simulator {
         Ok(())
     }
 }
+
+fn main() {}

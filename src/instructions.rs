@@ -113,6 +113,31 @@ impl InterruptCodes {
     }
 }
 
+pub enum ConditionCodes {
+    NS, NE, E, GT, LT,
+    GTE, LTE, OF, Z, NZ,
+    NEG, POS,
+}
+
+impl ConditionCodes {
+    pub fn value(self) -> u32 {
+        match self {
+            ConditionCodes::NS => 0,
+            ConditionCodes::NE => 1,
+            ConditionCodes::E => 2,
+            ConditionCodes::GT => 3,
+            ConditionCodes::LT => 4,
+            ConditionCodes::GTE => 5,
+            ConditionCodes::LTE => 6,
+            ConditionCodes::OF => 7,
+            ConditionCodes::Z => 8,
+            ConditionCodes::NZ => 9,
+            ConditionCodes::NEG => 10,
+            ConditionCodes::POS => 11,
+        }
+    }
+}
+
 /// Identifies the addressing mode of an instruction operand.
 #[derive(PartialEq,Debug)]
 pub enum AddrMode {
@@ -318,15 +343,15 @@ impl ControlOp {
     /// Returns the value of the operation field for the represented operation.
     pub fn value(self) -> u32 {
         match self {
-            ControlOp::JmpRD => 0,
+            ControlOp::JmpRD => 1,
             ControlOp::JmpI => 1,
-            ControlOp::JmpSRD => 2,
-            ControlOp::JmpSI => 3,
-            ControlOp::Sih => 4,
-            ControlOp::IntRD => 5,
-            ControlOp::IntI => 6,
-            ControlOp::RFI => 7,
-            ControlOp::Halt => 8,
+            ControlOp::JmpSRD => 1,
+            ControlOp::JmpSI => 1,
+            ControlOp::Sih => 1,
+            ControlOp::IntRD => 1,
+            ControlOp::IntI => 1,
+            ControlOp::RFI => 1,
+            ControlOp::Halt => 0,
 
         }
     }
@@ -334,14 +359,15 @@ impl ControlOp {
     /// Matches a value with a MemoryOp.
     pub fn match_val(val: u32) -> Option<ControlOp> {
         match val {
-            0 => Some(ControlOp::JmpRD),
+            1 => Some(ControlOp::JmpRD),
             1 => Some(ControlOp::JmpI),
-            2 => Some(ControlOp::JmpSRD),
-            3 => Some(ControlOp::JmpSI),
-            4 => Some(ControlOp::Sih),
-            5 => Some(ControlOp::IntRD),
-            6 => Some(ControlOp::IntI),
-            7 => Some(ControlOp::RFI),
+            1 => Some(ControlOp::JmpSRD),
+            1 => Some(ControlOp::JmpSI),
+            1 => Some(ControlOp::Sih),
+            1 => Some(ControlOp::IntRD),
+            1 => Some(ControlOp::IntI),
+            1 => Some(ControlOp::RFI),
+            0 => Some(ControlOp::Halt),
             _ => None,
         }
     }
@@ -858,11 +884,11 @@ impl Instruction for Comp {
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
         
         if self.op1 < self.op2 {
-            registers[STS] = 3;
+            registers[STS] = ConditionCodes::LT.value();
         } else if self.op1 > self.op2 {
-            registers[STS] = 2;
+            registers[STS] = ConditionCodes::GT.value();
         } else {
-            registers[STS] = 1;
+            registers[STS] = ConditionCodes::E.value();
         }
         
         return SimResult::Wait(0, ());
@@ -978,7 +1004,7 @@ impl Instruction for LS {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.amount = registers[instruction.get_bits(19..=23) as usize] as i32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.amount = instruction.get_bits(19..=31) as u32;
+            self.amount = instruction.get_bits(19..=31) as i32;
         }
         
         self.op = registers[self.dest] as i32;
@@ -1185,7 +1211,7 @@ impl Instruction for Jump {
                 registers[PC] = self.addr;
             }
             else if self.mem_addr_mode == AddrMode::Immediate {
-                registers[PC] += self.addr ;
+                registers[PC] += self.addr;
             }
         }
         
@@ -1601,7 +1627,7 @@ mod tests {
         const REG2: usize = 17;
         const VAL1: u32 = 12;
         const VAL2: u32 = 22;
-        const RESULT: u32 = 3;
+        let RESULT: u32 = ConditionCodes::LT.value();
         let mut instruction: u32 = 0;
         instruction.set_bits(14..=28, (REG1 as u32).get_bits(0..=4));
         instruction.set_bits(19..=23, (REG2 as u32).get_bits(0..=4));

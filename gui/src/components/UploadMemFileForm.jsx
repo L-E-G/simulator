@@ -122,28 +122,29 @@ const UploadMemFileForm = (props) => {
 
     reader.onload = () => {
 	   try {
-		  var array = new Uint8Array(reader.result);
-		  simulator.set_dram(array);
+		   	console.log(reader.result);
+			var array = new Uint8Array(reader.result);
+			simulator.set_dram(array);
 
-		  if (useSameFile === true) {
-			 localStorage.setItem(STORED_MEM_FILE_KEY, array);
-		  }
+			if (useSameFile === true) {
+				localStorage.setItem(STORED_MEM_FILE_KEY, array);
+			}
 
-		  setFileLoading(false);
-		  setExpanded(false);
-	   } catch(e) {
-		  setError(e);
-		  setFileSelected(false);
-		  setFileLoading(false);
+			setFileLoading(false);
+			setExpanded(false);
+		} catch(e) {
+			setError(e);
+			setFileSelected(false);
+			setFileLoading(false);
 	   }
     };
     
     const onFileChange = (e) => {
-	   setFileSelected(true);
-	   setFileLoading(true);
-	   setUseSameFile(useSameFileCheck);
-	   
-	   reader.readAsArrayBuffer(e.target.files[0]);
+		setFileSelected(true);
+		setFileLoading(true);
+		setUseSameFile(useSameFileCheck);
+		
+		reader.readAsArrayBuffer(e.target.files[0]);
     };
 
     const onUseSameFileChange = () => {

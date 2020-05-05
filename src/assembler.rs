@@ -1,4 +1,3 @@
-extern crate clap;
 use clap::{Arg, App};
 
 use bit_field::BitField;
@@ -6,11 +5,10 @@ use bit_field::BitField;
 use std::fs::{File};
 use std::io::{Read,Write,BufRead,BufReader,LineWriter};
 
-mod instructions;
-mod memory;
-mod result;
-use instructions::{InstructionT,ALUOp,MemoryOp,ControlOp};
-use memory::{Registers,Memory};
+// mod instructions;
+// mod memory;
+// mod result;
+use crate::instructions::{InstructionT,ALUOp,MemoryOp,ControlOp,ConditionCodes};
 
 /// A template for an instructions bit pattern.
 struct InstructionTemplate {
@@ -20,7 +18,7 @@ struct InstructionTemplate {
     /// Instruction type bits. Only 2 least significant bits are used.
     itype: u32,
 
-    /// Amount of least signficant bits of which are used from the
+    /// Amount of least significant bits of which are used from the
     /// operation field.
     num_operation_bits: u32,
 
@@ -36,16 +34,23 @@ struct InstructionTemplate {
 
 #[derive(Copy, Clone)]
 struct InstructionDetails {
-    condition: usize,
+    condition: u32,
     itype: u32,
     operation: u32,
     imm_idx: u32,
     operand1: u32,
     operand2: u32,
     operand3: u32,
+    /// Used only is there is a label associated with the instruction
+    label: u32,
 }
 
-/// Number of bits used in the operation field of ALU instructions.
+struct label {
+    addr: u32,
+    label: u32,
+}
+
+/// Number of bits used in the operation field of all instructions.
 const NUM_ALU_OP_BITS: u32 = 6;
 const NUM_MEMORY_OP_BITS: u32 = 3;
 const NUM_CONTROL_OP_BITS: u32 = 1;
@@ -53,7 +58,6 @@ const NUM_GRAPHICS_OP_BITS: u32 = 2;
 /// Indicates there is no immediate in instruction.
 const NO_IMMEDIATE: u32 = 1111;
 /// Used in the InstructionDetails struct to indicate that the operand field is not set.
-/// Used to tell how many operands there are in the instruction
 const NOT_SET: u32 = 11111111;
 /// Size of a reg addr.
 const SIZE_OF_REG: u32 = 5;
@@ -73,23 +77,46 @@ fn has_immediate(tokens: [&str; 4]) -> bool {
 
 // gets the immediate value
 fn from_immediate(token: &str) -> u32 {
-    return token[2..].parse::<u32>().unwrap();
+    return match token[2..].parse::<u32>() {
+        Err(e) => panic!("Failed to parse immediate value {}", e),
+        Ok(l) => l,
+    }
 }
 
 // gets the reg address
 fn from_register(token: &str) -> u32 {
-    return token[1..].parse::<u32>().unwrap();
+    return match token[1..].parse::<u32>() {
+        Err(e) => panic!("Failed to parse reg dir value {}", e),
+        Ok(l) => l,
+    }
 }
 
 // converts a vector into an array, this is for borrow issues with vectors
 fn to_array(tokens: Vec<&str>) -> [&str; 4] {
     let mut array = [""; 4];
 
-    let mut index = 0;
-    for tok in tokens {
-        array[index] = tok;
-        index += 1;
+    let mut i = 0;
+    for t in tokens {
+        if t == "" {
+            continue;
+        }
+        else {
+            array[i] = t;
+            i += 1;
+        }
     }
+    
+    // if tokens[0] == "" {
+    //     for i in 1..tokens.len() {
+    //         array[i-1] = tokens[i];
+    //     }
+    // } else {
+    //     for i in 0..tokens.len() {
+    //         array[i] = tokens[i];
+    //     }
+    // }
+
+    
     return array;
 }
 
@@ -101,7 +128,22 @@ fn tokens_length(tokens: [&str; 4]) -> u32 {
     return length;
 }
 
-fn main() {
+fn get_condition_code(CC: String) -> u32 {
+    if CC == "GT" {
+        return ConditionCodes::GT.value();
+    }
+    else if CC == "LT" {
+        return ConditionCodes::LT.value();
+    }
+    else if CC == "E" {
+        return ConditionCodes::E.value();
+    }
+    else {
+        panic!("Improper condition code");
+    }
+}
+
+pub fn assembler(file: &str) {
     // Define instruction mnemonics
     let mnemonics = vec![
         InstructionTemplate{
@@ -147,7 +189,7 @@ fn main() {
         InstructionTemplate{
             mnemonic: "JMP".to_string(),
             itype: InstructionT::Control.value(),
-            num_operation_bits: NUM_MEMORY_OP_BITS,
+            num_operation_bits: NUM_CONTROL_OP_BITS,
             operationI: ControlOp::JmpI.value(),
             operationRD: ControlOp::JmpRD.value(),
             immediate_idx: 1,
@@ -155,7 +197,31 @@ fn main() {
         InstructionTemplate{
             mnemonic: "JMPS".to_string(),
             itype: InstructionT::Control.value(),
-            num_operation_bits: NUM_MEMORY_OP_BITS,
+            num_operation_bits: NUM_CONTROL_OP_BITS,
+            operationI: ControlOp::JmpSI.value(),
+            operationRD: ControlOp::JmpSRD.value(),
+            immediate_idx: 1,
+        },
+        InstructionTemplate{
+            mnemonic: "JMPGT".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_CONTROL_OP_BITS,
+            operationI: ControlOp::JmpSI.value(),
+            operationRD: ControlOp::JmpSRD.value(),
+            immediate_idx: 1,
+        },
+        InstructionTemplate{
+            mnemonic: "JMPLT".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_CONTROL_OP_BITS,
+            operationI: ControlOp::JmpSI.value(),
+            operationRD: ControlOp::JmpSRD.value(),
+            immediate_idx: 1,
+        },
+        InstructionTemplate{
+            mnemonic: "JMPE".to_string(),
+            itype: InstructionT::Control.value(),
+            num_operation_bits: NUM_CONTROL_OP_BITS,
             operationI: ControlOp::JmpSI.value(),
             operationRD: ControlOp::JmpSRD.value(),
             immediate_idx: 1,
@@ -163,7 +229,7 @@ fn main() {
         InstructionTemplate{
             mnemonic: "JMPI".to_string(),
             itype: InstructionT::Control.value(),
-            num_operation_bits: NUM_MEMORY_OP_BITS,
+            num_operation_bits: NUM_CONTROL_OP_BITS,
             operationI: NO_IMMEDIATE,
             operationRD: ControlOp::RFI.value(),
             immediate_idx: NO_IMMEDIATE,
@@ -307,6 +373,7 @@ fn main() {
     ];
     
     let mut first_pass = Vec::new();
+    let mut labels = Vec::new();
     
     // Parse command line arguments
     // let app = App::new("LEG assembler")
@@ -329,7 +396,7 @@ fn main() {
     // let out_binary_path = app.value_of("OUT_BINARY").unwrap();
 
     // Read assembly file
-    let in_assembly_f = match File::open("test-data/assembly") {
+    let in_assembly_f = match File::open(format!("test-data/{}",file)) {
         Err(e) => panic!("Failed to open input assembly file: {}", e),
         Ok(f) => f,
     };
@@ -344,20 +411,35 @@ fn main() {
 
         if line.len() > 0 {
             // Parse the line
-            let tokens_vec: Vec<&str> = line.split(" ").collect();
+            let mut tokens_vec: Vec<&str> = line.split(" ").collect();
 
-            // Convert to array for borrow issues, can't borrow with vectors
-            let tokens = to_array(tokens_vec);
-            let tokens_len: u32 = tokens_length(tokens);
-            
             // get first character
             let first_char = line.chars().nth(0)
                 .expect(&format!("No 0th character found for non-empty line {}",line_num));
 
-            // Check id valid line
-            if first_char == ' ' && first_char == '\t' {
-                panic!("Invalid instruction");
+            // identify if label
+            // Create unique identifier based on character's 
+            if first_char != ' ' {
+                let label_arr = tokens_vec[0].as_bytes();
+                let mut label: u32 = 0;
+                for i in 0..label_arr.len() {
+                    label += label_arr[i] as u32;
+                }
+                // save position and name of label
+                labels.push(label{
+                    addr: line_num-1,
+                    label: label,
+                });
+                
+                // Remove label and carry on as if this is a normal instruction
+                tokens_vec.remove(0);
             }
+            
+            // Convert to array for borrow issues, can't borrow with vectors
+            let tokens = to_array(tokens_vec);
+
+            let tokens_len: u32 = tokens_length(tokens);
+            
 
             // TODO: Be able to pull condition codes from instructions
             // let condition, mnemonic = fn_which_extract_condition_codes_from_end_of_mnemonics(token[1]);
@@ -375,16 +457,33 @@ fn main() {
                 operand1: NOT_SET,
                 operand2: NOT_SET,
                 operand3: NOT_SET,
+                label: NOT_SET,
             };
 
             // Jump through template table to find the template that matches the current line
             for t in &mnemonics {
+                println!("{}",tokens[0]);
                 // Find correct template
                 if tokens[0] == t.mnemonic {
-                    
                     // Set initial values
                     inst.itype = t.itype;
                     inst.operation = t.operationRD;
+                    
+                    if tokens[0][..3] == "JMP".to_string() {
+                        inst.condition = get_condition_code(tokens[0][3..].to_string());
+                        inst.imm_idx = t.immediate_idx;
+                        inst.operation = t.operationI;
+                        inst.label = {
+                            let label_arr = tokens[1].as_bytes();
+                            let mut label: u32 = 0;
+                            for i in 0..label_arr.len() {
+                                label += label_arr[i] as u32;
+                            }
+                            label
+                        };
+                        
+                        break;
+                    }
 
                     // Check if there are no operands
                     if tokens_len == 1 {
@@ -419,7 +518,6 @@ fn main() {
                     break;
                 }
             }
-
             // Push to first pass vector
             first_pass.push(inst);
         }
@@ -437,7 +535,7 @@ fn main() {
     //     operand3: 0,
     // };
 
-    let mut file = match File::create("test-data/instructions.bin") {
+    let mut file = match File::create(format!("test-data/{}.bin",file)) {
         Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
         Ok(f) => f,
     };
@@ -447,7 +545,7 @@ fn main() {
     let mut index = 0;
     for inst in first_pass {
         let mut fc_idx = 0;
-
+        
         let mut inst_pos: u32 = 0;
         let mut instruction: u32 = 0;
     
@@ -479,8 +577,17 @@ fn main() {
                 inst.operation.get_bits(0..=NUM_GRAPHICS_OP_BITS as usize));
             inst_pos += NUM_GRAPHICS_OP_BITS;
         }
-
-        // Set first operand
+        
+        if inst.label != NOT_SET {
+            for l in &labels {
+                if l.label == inst.label {
+                    instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
+                        l.addr.get_bits(0..=SIZE_OF_REG as usize));
+                }
+            }
+        }
+        
+        // Set first operand (if applicable)
         if inst.operand1 != NOT_SET {
             if index == inst.imm_idx {
                 instruction.set_bits(inst_pos as usize..=(32 - inst_pos) as usize, 
@@ -514,7 +621,7 @@ fn main() {
                 inst.operand3.get_bits(0..=SIZE_OF_REG as usize));
         }
 
-        // Convert to [u8] for .write_all()
+        // Convert to [u8] for .write()
         let b1: u8 = ((instruction >> 24) & 0xff) as u8;
         let b2: u8 = ((instruction >> 16) & 0xff) as u8;
         let b3: u8 = ((instruction >> 8) & 0xff) as u8;
@@ -526,9 +633,7 @@ fn main() {
 
         index += 1;
     } 
-    
-    
-    // writer.write_all(&file_contents);
+    // panic!("Rob");
 }
 
 #[cfg(test)]
@@ -538,12 +643,6 @@ mod tests {
     
     #[test]
     fn test_assembler() {
-        // let scenario = Scenario::new();
-
-        // let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
-        
-        // let mut regs = Registers::new();
-
-        main();
+        assembler("assembly");
     }
 }

@@ -15,7 +15,7 @@ path = "src/text_simulator.rs"
 
 [[bin]]
 name = "assembler"
-path = "src/assembler.rs"
+path = "src/wasm_simulator.rs"
 
 [dependencies]
 text_io = "0.1.8"
