@@ -140,6 +140,7 @@ const UploadMemFileForm = (props) => {
     };
     
     const onFileChange = (e) => {
+		// simulator.use_assembler(e.target.files[0].name);
 		setFileSelected(true);
 		setFileLoading(true);
 		setUseSameFile(useSameFileCheck);

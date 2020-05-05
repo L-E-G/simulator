@@ -53,10 +53,12 @@ struct label {
 /// Number of bits used in the operation field of all instructions.
 const NUM_ALU_OP_BITS: u32 = 6;
 const NUM_MEMORY_OP_BITS: u32 = 3;
-const NUM_CONTROL_OP_BITS: u32 = 1;
+const NUM_CONTROL_OP_BITS: u32 = 3;
 const NUM_GRAPHICS_OP_BITS: u32 = 2;
 /// Indicates there is no immediate in instruction.
 const NO_IMMEDIATE: u32 = 1111;
+/// INdicates that there is no condition code.
+const NO_CONDITION_CODE: u32 = 11111;
 /// Used in the InstructionDetails struct to indicate that the operand field is not set.
 const NOT_SET: u32 = 11111111;
 /// Size of a reg addr.
@@ -105,18 +107,6 @@ fn to_array(tokens: Vec<&str>) -> [&str; 4] {
             i += 1;
         }
     }
-    
-    // if tokens[0] == "" {
-    //     for i in 1..tokens.len() {
-    //         array[i-1] = tokens[i];
-    //     }
-    // } else {
-    //     for i in 0..tokens.len() {
-    //         array[i] = tokens[i];
-    //     }
-    // }
-
-    
     return array;
 }
 
@@ -128,19 +118,30 @@ fn tokens_length(tokens: [&str; 4]) -> u32 {
     return length;
 }
 
-fn get_condition_code(CC: String) -> u32 {
-    if CC == "GT" {
-        return ConditionCodes::GT.value();
+fn get_condition_code(mnemonic: &str) -> u32 {
+
+    for i in 0..mnemonic.len() {
+        if mnemonic[i..i+1] == "E".to_string() {
+            return ConditionCodes::E.value();
+        }
+        if mnemonic[i..i+1] == "L".to_string() {
+            if i+1 >= mnemonic.len() {
+                return NO_CONDITION_CODE;
+            }
+            if mnemonic[i..i+2] == "T".to_string() {
+                return ConditionCodes::LT.value();
+            }
+        }
+        if mnemonic[i..i+1] == "G".to_string() {
+            if i+1 >= mnemonic.len() {
+                return NO_CONDITION_CODE;
+            }
+            if mnemonic[i..i+2] == "T".to_string() {
+                return ConditionCodes::GT.value();
+            }
+        }
     }
-    else if CC == "LT" {
-        return ConditionCodes::LT.value();
-    }
-    else if CC == "E" {
-        return ConditionCodes::E.value();
-    }
-    else {
-        panic!("Improper condition code");
-    }
+    return NO_CONDITION_CODE;
 }
 
 pub fn assembler(file: &str) {
@@ -206,24 +207,24 @@ pub fn assembler(file: &str) {
             mnemonic: "JMPGT".to_string(),
             itype: InstructionT::Control.value(),
             num_operation_bits: NUM_CONTROL_OP_BITS,
-            operationI: ControlOp::JmpSI.value(),
-            operationRD: ControlOp::JmpSRD.value(),
+            operationI: ControlOp::JmpI.value(),
+            operationRD: ControlOp::JmpRD.value(),
             immediate_idx: 1,
         },
         InstructionTemplate{
             mnemonic: "JMPLT".to_string(),
             itype: InstructionT::Control.value(),
             num_operation_bits: NUM_CONTROL_OP_BITS,
-            operationI: ControlOp::JmpSI.value(),
-            operationRD: ControlOp::JmpSRD.value(),
+            operationI: ControlOp::JmpI.value(),
+            operationRD: ControlOp::JmpRD.value(),
             immediate_idx: 1,
         },
         InstructionTemplate{
             mnemonic: "JMPE".to_string(),
             itype: InstructionT::Control.value(),
             num_operation_bits: NUM_CONTROL_OP_BITS,
-            operationI: ControlOp::JmpSI.value(),
-            operationRD: ControlOp::JmpSRD.value(),
+            operationI: ControlOp::JmpI.value(),
+            operationRD: ControlOp::JmpRD.value(),
             immediate_idx: 1,
         },
         InstructionTemplate{
@@ -418,8 +419,8 @@ pub fn assembler(file: &str) {
                 .expect(&format!("No 0th character found for non-empty line {}",line_num));
 
             // identify if label
-            // Create unique identifier based on character's 
             if first_char != ' ' {
+                // Create unique identifier based on character's 
                 let label_arr = tokens_vec[0].as_bytes();
                 let mut label: u32 = 0;
                 for i in 0..label_arr.len() {
@@ -440,11 +441,6 @@ pub fn assembler(file: &str) {
 
             let tokens_len: u32 = tokens_length(tokens);
             
-
-            // TODO: Be able to pull condition codes from instructions
-            // let condition, mnemonic = fn_which_extract_condition_codes_from_end_of_mnemonics(token[1]);
-
-            
             // Get immediate indexes if there are any
             let has_immediate = has_immediate(tokens);
 
@@ -462,26 +458,29 @@ pub fn assembler(file: &str) {
 
             // Jump through template table to find the template that matches the current line
             for t in &mnemonics {
-                println!("{}",tokens[0]);
                 // Find correct template
                 if tokens[0] == t.mnemonic {
                     // Set initial values
                     inst.itype = t.itype;
                     inst.operation = t.operationRD;
-                    
-                    if tokens[0][..3] == "JMP".to_string() {
-                        inst.condition = get_condition_code(tokens[0][3..].to_string());
-                        inst.imm_idx = t.immediate_idx;
+
+                    // Check if includes any labels
+                    if tokens[0][..3] == "JMP".to_string() && !has_immediate && tokens[1][0..1] != "R".to_string() {
+                        // Compute label's unique value
+                        let label_arr = tokens[1].as_bytes();
+                        let mut label: u32 = 0;
+                        for i in 0..label_arr.len() {
+                            label += label_arr[i] as u32;
+                        }
+
                         inst.operation = t.operationI;
-                        inst.label = {
-                            let label_arr = tokens[1].as_bytes();
-                            let mut label: u32 = 0;
-                            for i in 0..label_arr.len() {
-                                label += label_arr[i] as u32;
-                            }
-                            label
-                        };
-                        
+                        inst.label = label;
+
+                        let cond = get_condition_code(tokens[0]);
+
+                        if cond != NO_CONDITION_CODE {
+                            inst.condition = cond;
+                        }
                         break;
                     }
 
@@ -533,6 +532,7 @@ pub fn assembler(file: &str) {
     //     operand1: 0,
     //     operand2: 0,
     //     operand3: 0,
+    //     label: 0,
     // };
 
     let mut file = match File::create(format!("test-data/{}.bin",file)) {
@@ -581,8 +581,8 @@ pub fn assembler(file: &str) {
         if inst.label != NOT_SET {
             for l in &labels {
                 if l.label == inst.label {
-                    instruction.set_bits(inst_pos as usize..=(inst_pos + SIZE_OF_REG) as usize, 
-                        l.addr.get_bits(0..=SIZE_OF_REG as usize));
+                    instruction.set_bits(inst_pos as usize..=(32 - inst_pos) as usize, 
+                        l.addr.get_bits(0..=(32 - inst_pos) as usize));
                 }
             }
         }
@@ -634,6 +634,10 @@ pub fn assembler(file: &str) {
         index += 1;
     } 
     // panic!("Rob");
+}
+
+pub fn load_data () {
+
 }
 
 #[cfg(test)]

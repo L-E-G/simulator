@@ -333,8 +333,8 @@ impl ALUOp {
 pub enum ControlOp {
     JmpRD, JmpI,
     JmpSRD, JmpSI,
-    Sih,
-    IntRD, IntI, 
+    // Sih,
+    // IntRD, IntI, 
     RFI,
     Halt,
 }
@@ -343,31 +343,30 @@ impl ControlOp {
     /// Returns the value of the operation field for the represented operation.
     pub fn value(self) -> u32 {
         match self {
-            ControlOp::JmpRD => 1,
-            ControlOp::JmpI => 1,
-            ControlOp::JmpSRD => 1,
-            ControlOp::JmpSI => 1,
-            ControlOp::Sih => 1,
-            ControlOp::IntRD => 1,
-            ControlOp::IntI => 1,
-            ControlOp::RFI => 1,
             ControlOp::Halt => 0,
-
+            ControlOp::JmpRD => 1,
+            ControlOp::JmpI => 2,
+            ControlOp::JmpSRD => 3,
+            ControlOp::JmpSI => 4,
+            // ControlOp::Sih => 1,
+            // ControlOp::IntRD => 1,
+            // ControlOp::IntI => 1,
+            ControlOp::RFI => 5,
         }
     }
 
     /// Matches a value with a MemoryOp.
     pub fn match_val(val: u32) -> Option<ControlOp> {
         match val {
-            1 => Some(ControlOp::JmpRD),
-            1 => Some(ControlOp::JmpI),
-            1 => Some(ControlOp::JmpSRD),
-            1 => Some(ControlOp::JmpSI),
-            1 => Some(ControlOp::Sih),
-            1 => Some(ControlOp::IntRD),
-            1 => Some(ControlOp::IntI),
-            1 => Some(ControlOp::RFI),
             0 => Some(ControlOp::Halt),
+            1 => Some(ControlOp::JmpRD),
+            2 => Some(ControlOp::JmpI),
+            3 => Some(ControlOp::JmpSRD),
+            4 => Some(ControlOp::JmpSI),
+            // 1 => Some(ControlOp::Sih),
+            // 1 => Some(ControlOp::IntRD),
+            // 1 => Some(ControlOp::IntI),
+            5 => Some(ControlOp::RFI),
             _ => None,
         }
     }

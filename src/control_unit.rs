@@ -207,12 +207,12 @@ impl ControlUnit {
                                 Jump::new(AddrMode::RegisterDirect, true))),
                             Some(ControlOp::JmpSI) => Ok(Box::new(
                                 Jump::new(AddrMode::Immediate, true))),
-                            Some(ControlOp::Sih) => Ok(Box::new(
-                                SIH::new())),
-                            Some(ControlOp::IntRD) => Ok(Box::new(
-                                INT::new(AddrMode::RegisterDirect))),
-                            Some(ControlOp::IntI) => Ok(Box::new(
-                                INT::new(AddrMode::Immediate))),
+                            // Some(ControlOp::Sih) => Ok(Box::new(
+                            //     SIH::new())),
+                            // Some(ControlOp::IntRD) => Ok(Box::new(
+                            //     INT::new(AddrMode::RegisterDirect))),
+                            // Some(ControlOp::IntI) => Ok(Box::new(
+                            //     INT::new(AddrMode::Immediate))),
                             Some(ControlOp::RFI) => Ok(Box::new(
                                 RFI::new())),
                             _ => Err(format!("Invalid operation code {} for \
@@ -220,7 +220,7 @@ impl ControlUnit {
                         }
                     }
 
-                    // Immediates:
+                    // sign/unsign:
                     // Unsigned = false
                     // Signed = true
                     Some(InstructionT::ALU) => {

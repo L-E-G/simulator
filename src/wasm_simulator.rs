@@ -90,8 +90,13 @@ impl Simulator {
         }
     }
 
-    fn use_assembler(file: &str) -> JsValue {
-        JsValue::from_serde(&assembler(file)).unwrap()
+    /// Calls the assembler with whatever file you pass to it, after that it will
+    /// load it into memory.
+    pub fn use_assembler(&mut self, file: &str) -> Result<(), JsValue> {
+        
+        assembler(file);
+        self.control_unit.load_memory_from_file(&format!("test-data/{}.bin",file));
+        Ok(())
     }
 
     /// Returns addresses and values in DRAM. First returned value is a list of

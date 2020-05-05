@@ -1,7 +1,7 @@
- ADDU R1 R3 0d45
- ADDU R2 R8 R12
- LDR R4 R8
- JMPGT label_1
- PUSH R15
-label_1 STR R2 R9
+label_1 STR R2 0d9
+ LDR R4 0d0
+ LDR R5 0d3
+ CMP R4 R5
+ JMP label_1
+ ADDU R6 R4 R5
  HALT
