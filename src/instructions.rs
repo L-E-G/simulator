@@ -1202,16 +1202,24 @@ impl Instruction for Jump {
     }
 
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
+        registers[PC] = self.addr;
         if self.condition == registers[STS] {
             if self.is_sub {
                 registers[LR] = (PC + 1) as u32;
             } 
-            else if self.mem_addr_mode == AddrMode::RegisterDirect {
-                registers[PC] = self.addr;
-            }
-            else if self.mem_addr_mode == AddrMode::Immediate {
-                registers[PC] += self.addr;
-            }
+            // else if self.mem_addr_mode == AddrMode::RegisterDirect {
+            //     registers[PC] = self.addr;
+            // }
+            // else if self.mem_addr_mode == AddrMode::Immediate {
+            //     registers[PC] += self.addr;
+            // }
+        } else if self.condition == 0 {
+            // if self.mem_addr_mode == AddrMode::RegisterDirect {
+            //     registers[PC] = self.addr;
+            // }
+            // else if self.mem_addr_mode == AddrMode::Immediate {
+            //     registers[PC] += self.addr;
+            // }
         }
         
         

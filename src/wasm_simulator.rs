@@ -21,7 +21,6 @@ mod assembler;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
 use crate::memory::{Memory,InspectableMemory};
-use crate::assembler::assembler;
 
 /// Represents the state of stages in the pipeline.
 /// Values are names of the instruction in each stage.
@@ -91,11 +90,14 @@ impl Simulator {
     }
 
     /// Calls the assembler with whatever file you pass to it, after that it will
-    /// load it into memory.
-    pub fn use_assembler(&mut self, file: &str) -> Result<(), JsValue> {
+    /// load the bin file into memory and load the data into memory.
+    pub fn use_assembler_load_dram(&mut self, file: &str) -> Result<(), JsValue> {
+        let start_addr = self.control_unit.assembler.assembler(file);
         
-        assembler(file);
         self.control_unit.load_memory_from_file(&format!("test-data/{}.bin",file));
+        self.control_unit.memory.start_addr = start_addr;
+
+        self.control_unit.load_memory_from_file("test-data/data");
         Ok(())
     }
 

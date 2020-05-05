@@ -46,6 +46,21 @@ pub const SP: usize = 30;
 /// Link register index
 pub const LR: usize = 31;
 
+
+/// Start of the program memory
+// pub struct Memory_Start {
+//     PROG_MEM_START: u32,
+// }
+
+// impl Memory_Start {
+//     pub fn new() -> Memory_Start {
+//         Memory_Start {
+//             PROG_MEM_START: 0,
+//         }
+//     }
+    
+// }
+
 impl Registers {
     pub fn new() -> Registers {
         Registers{
@@ -125,6 +140,7 @@ pub trait InspectableMemory<A, D> {
 pub struct DRAM {
     delay: u16,
     data: HashMap<u32, u32>,
+    pub start_addr: u32,
 }
 
 impl DRAM {
@@ -133,6 +149,7 @@ impl DRAM {
         DRAM{
             delay: delay,
             data: HashMap::new(),
+            start_addr: 0,
         }
     }
 
@@ -158,7 +175,7 @@ impl DRAM {
     /// in memory. The address in memory will increment by 1 for word loaded.
     pub fn load_from_reader(&mut self, src: impl Read) -> Result<(), String> {
         let mut reader = BufReader::new(src);
-        let mut addr: u32 = 0;
+        let mut addr: u32 = self.start_addr;
         let mut buf: [u8; 4] = [0; 4];
 
         loop {

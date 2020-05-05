@@ -12,6 +12,7 @@ use crate::instructions::{Instruction,InstructionT,
     Comp,AS,LS,LogicType,ThreeOpLogic,Not,
     ControlOp,Jump,SIH,INT,RFI,
 };
+use crate::assembler::Assembler;
 
 /// Responsible for running instructions.
 pub struct ControlUnit {
@@ -23,6 +24,9 @@ pub struct ControlUnit {
 
     /// Memory system.
     pub memory: DRAM,
+
+    // Assembler instance.
+    pub assembler: Assembler,
 
     /// Indicates that the processor has loaded the first instruction yet.
     pub first_instruction_loaded: bool,
@@ -92,6 +96,7 @@ impl ControlUnit {
             cycle_count: 0,
             registers: Registers::new(),
             memory: DRAM::new(100),
+            assembler: Assembler::new(),
             first_instruction_loaded: false,
             fetch_instruction: None,            
             decode_instruction: None,
