@@ -337,6 +337,7 @@ pub enum ControlOp {
     // IntRD, IntI, 
     RFI,
     Halt,
+    Noop,
 }
 
 impl ControlOp {
@@ -352,6 +353,7 @@ impl ControlOp {
             // ControlOp::IntRD => 1,
             // ControlOp::IntI => 1,
             ControlOp::RFI => 5,
+            ControlOp::Noop => 6,
         }
     }
 
@@ -367,6 +369,7 @@ impl ControlOp {
             // 1 => Some(ControlOp::IntRD),
             // 1 => Some(ControlOp::IntI),
             5 => Some(ControlOp::RFI),
+            6 => Some(ControlOp::Noop),
             _ => None,
         }
     }
@@ -396,7 +399,6 @@ impl Instruction for Halt {
         return SimResult::Wait(0, ());
     }
 
-    /// Skipped, no memory accessing.
     fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
@@ -426,7 +428,7 @@ pub struct Load {
 
 impl Display for Load {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Load ({})", self.mem_addr_mode)
+        write!(f, "Load Instruction ({})", self.mem_addr_mode)
     }
 }
 
@@ -450,7 +452,8 @@ impl Instruction for Load {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.mem_addr = registers[instruction.get_bits(15..=19) as usize];
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.mem_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
+            self.mem_addr = instruction.get_bits(15..=19) as u32;
+            // self.mem_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(16..=31) as i32)) as u32;
         }
 
         return SimResult::Wait(0, ());
@@ -506,19 +509,19 @@ impl Store {
 
 impl Display for Store {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Store")
+        write!(f, "Store Instruction")
     }
 }
 
 impl Instruction for Store {
     /// Extract operands and retrieve value to save in memory from registers.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.dest_addr = registers[instruction.get_bits(11..=15) as usize] as u32;
+        self.dest_addr = registers[instruction.get_bits(10..=14) as usize] as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.value = registers[instruction.get_bits(16..=20) as usize] as u32;
+            self.value = registers[instruction.get_bits(15..=19) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.value = (((registers[PC] + 1) as i32) + (instruction.get_bits(16..=31) as i32)) as u32;
+            self.value = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
         }
 
         SimResult::Wait(0, ())
@@ -668,7 +671,7 @@ impl Move {
 
 impl Display for Move {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Move")
+        write!(f, "Move Instruction")
     }
 }
 
@@ -679,9 +682,9 @@ impl Instruction for Move {
     /// Extract source register that holds the value to move.
     /// Get the value to move and add it to the value field.
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.value = registers[instruction.get_bits(19..=23) as usize];
+        self.value = registers[instruction.get_bits(18..=22) as usize];
 
-        self.dest = instruction.get_bits(14..=18) as usize;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
         return SimResult::Wait(0, ());
     }
@@ -804,27 +807,32 @@ impl Display for ArithUnsign {
 impl Instruction for ArithUnsign {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
-        self.dest = instruction.get_bits(14..=18) as usize;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
-        self.op1 = registers[instruction.get_bits(19..=23) as usize] as u32;
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.op2 = registers[instruction.get_bits(24..=28) as usize] as u32;
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.op2 = instruction.get_bits(24..=31) as u32;
+            self.op2 = instruction.get_bits(23..=31) as u32;
         }
         
         return SimResult::Wait(0, ());
+        // return SimResult::Err(format!("Instruction details: dest: {}, op1: {}, op2: {}",self.dest, self.op1, self.op2));
     }
 
     fn execute(&mut self) -> SimResult<(), String> {
         match self.operation {
-            ArithMode::Add => self.result = self.op1 + self.op2,
+            ArithMode::Add => {
+                self.result = self.op1 + self.op2;
+                // return SimResult::Err(format!("Instruction details: result: {}, op1: {}, op2: {}",self.result, self.op1, self.op2));
+            },
             ArithMode::Sub => self.result = self.op1 - self.op2,
             ArithMode::Mul => self.result = self.op1 * self.op2,
             ArithMode::Div => self.result = self.op1 / self.op2,
         }
         return SimResult::Wait(0, ());
+        // return SimResult::Err(format!("Instruction details: result: {}, op1: {}, op2: {}",self.result, self.op1, self.op2));
     }
 
     /// Skipped, no memory accessing.
@@ -856,16 +864,16 @@ impl Comp {
 
 impl Display for Comp {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Comp")
+        write!(f, "Comp Instruction")
     }
 }
 
 impl Instruction for Comp {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
-        self.op1 = registers[instruction.get_bits(14..=18) as usize] as u32;
+        self.op1 = registers[instruction.get_bits(13..=17) as usize] as u32;
 
-        self.op2 = registers[instruction.get_bits(19..=23) as usize] as u32;
+        self.op2 = registers[instruction.get_bits(18..=22) as usize] as u32;
         
         return SimResult::Wait(0, ());
     }
@@ -928,12 +936,12 @@ impl Display for AS {
 impl Instruction for AS {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
-        self.dest = instruction.get_bits(14..=18) as usize;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.amount = registers[instruction.get_bits(19..=23) as usize] as u32;
+            self.amount = registers[instruction.get_bits(18..=22) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.amount = instruction.get_bits(19..=31) as u32;
+            self.amount = instruction.get_bits(18..=31) as u32;
         }
         
         self.op = registers[self.dest] as u32;
@@ -998,12 +1006,12 @@ impl Display for LS {
 impl Instruction for LS {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
-        self.dest = instruction.get_bits(14..=18) as usize;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.amount = registers[instruction.get_bits(19..=23) as usize] as i32;
+            self.amount = registers[instruction.get_bits(18..=22) as usize] as i32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.amount = instruction.get_bits(19..=31) as i32;
+            self.amount = instruction.get_bits(18..=31) as i32;
         }
         
         self.op = registers[self.dest] as i32;
@@ -1067,14 +1075,14 @@ impl Display for ThreeOpLogic {
 impl Instruction for ThreeOpLogic {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
 
-        self.dest = instruction.get_bits(14..=18) as usize;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
-        self.op1 = registers[instruction.get_bits(19..=23) as usize] as u32;
+        self.op1 = registers[instruction.get_bits(18..=22) as usize] as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.op2 = registers[instruction.get_bits(24..=28) as usize] as u32;
+            self.op2 = registers[instruction.get_bits(23..=27) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.op2 = instruction.get_bits(24..=31) as u32;
+            self.op2 = instruction.get_bits(23..=31) as u32;
         }
 
         return SimResult::Wait(0, ());
@@ -1128,9 +1136,9 @@ impl Display for Not {
 
 impl Instruction for Not {
     fn decode(&mut self, instruction: u32, registers: &Registers) -> SimResult<(), String> {
-        self.dest = instruction.get_bits(14..=18) as usize;
+        self.dest = instruction.get_bits(13..=17) as usize;
 
-        self.op = registers[instruction.get_bits(19..=23) as usize] as u32;
+        self.op = registers[instruction.get_bits(18..=22) as usize] as u32;
 
         return SimResult::Wait(0, ());
     }
@@ -1175,7 +1183,7 @@ impl Jump {
 
 impl Display for Jump {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Jump")
+        write!(f, "Jump Instruction")
     }
 }
 
@@ -1184,9 +1192,9 @@ impl Instruction for Jump {
         self.condition = instruction.get_bits(0..=4) as u32;
 
         if self.mem_addr_mode == AddrMode::RegisterDirect {
-            self.addr = registers[instruction.get_bits(8..=12) as usize] as u32;
+            self.addr = registers[instruction.get_bits(10..=14) as usize] as u32;
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.addr = instruction.get_bits(8..=31) as u32;
+            self.addr = instruction.get_bits(10..=31) as u32;
         }
 
         return SimResult::Wait(0, ());
@@ -1202,18 +1210,23 @@ impl Instruction for Jump {
     }
 
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String> {
-        registers[PC] = self.addr;
-        if self.condition == registers[STS] {
-            if self.is_sub {
-                registers[LR] = (PC + 1) as u32;
-            } 
-            // else if self.mem_addr_mode == AddrMode::RegisterDirect {
-            //     registers[PC] = self.addr;
-            // }
-            // else if self.mem_addr_mode == AddrMode::Immediate {
-            //     registers[PC] += self.addr;
-            // }
-        } else if self.condition == 0 {
+        
+        if self.condition != 0 {
+            if self.condition == registers[STS] {
+                if self.is_sub {
+                    registers[LR] = (PC + 1) as u32;
+                } 
+                registers[PC] = self.addr;
+                // else if self.mem_addr_mode == AddrMode::RegisterDirect {
+                //     registers[PC] = self.addr;
+                // }
+                // else if self.mem_addr_mode == AddrMode::Immediate {
+                //     registers[PC] += self.addr;
+                // }
+            }
+
+        } else {
+            registers[PC] = self.addr;
             // if self.mem_addr_mode == AddrMode::RegisterDirect {
             //     registers[PC] = self.addr;
             // }
