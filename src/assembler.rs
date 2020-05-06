@@ -151,7 +151,7 @@ impl Assembler {
         Assembler{}
     }
 
-    pub fn assembler(&self, file: &str) -> u32{
+    pub fn assembler(&self, content: Vec<&str>) -> Vec<u8>{
         // Define instruction mnemonics
         let mnemonics = vec![
             InstructionTemplate{
@@ -403,19 +403,25 @@ impl Assembler {
         // let in_assembly_path = app.value_of("IN_ASSEMBLY").unwrap();
         // let out_binary_path = app.value_of("OUT_BINARY").unwrap();
 
-        // Read assembly file
-        let in_assembly_f = match File::open(format!("test-data/{}",file)) {
-            Err(e) => panic!("Failed to open input assembly file: {}", e),
-            Ok(f) => f,
-        };
-        let in_assembly_buf = BufReader::new(in_assembly_f);
 
-        let mut line_num = 1;
-        for in_line in in_assembly_buf.lines() {
-            let line = match in_line {
-                Err(e) => panic!("Failed to read line number {}", line_num),
-                Ok(l) => l,
-            };
+
+
+        // // Read assembly file
+        // let in_assembly_f = match File::open(format!("test-data/{}",file)) {
+        //     Err(e) => panic!("Failed to open input assembly file: {}", e),
+        //     Ok(f) => f,
+        // };
+        // let in_assembly_buf = BufReader::new(in_assembly_f);
+
+
+
+
+        let mut index = 0;
+        for line in content {
+            // let line = match in_line {
+            //     Err(e) => panic!("Failed to read line number {}: {}",index + 1,e).unwrap(),
+            //     Ok(l) => l,
+            // };
 
             if line.len() > 0 {
                 // Parse the line
@@ -423,7 +429,7 @@ impl Assembler {
 
                 // get first character
                 let first_char = line.chars().nth(0)
-                    .expect(&format!("No 0th character found for non-empty line {}",line_num));
+                    .expect(&format!("No 0th character found for non-empty line {}",index + 1));
 
                 // identify if label
                 if first_char != ' ' {
@@ -435,7 +441,7 @@ impl Assembler {
                     }
                     // save position and name of label
                     labels.push(label{
-                        addr: line_num-1,
+                        addr: index,
                         label: label,
                     });
                     
@@ -480,7 +486,7 @@ impl Assembler {
                                 label += label_arr[i] as u32;
                             }
 
-                            // inst.operation = t.operation;
+                            inst.operation = t.operationI;
                             inst.label = label;
 
                             let cond = get_condition_code(tokens[0]);
@@ -527,7 +533,7 @@ impl Assembler {
                 // Push to first pass vector
                 first_pass.push(inst);
             }
-            line_num += 1;
+            index += 1;
         }
         
         // template:
@@ -542,11 +548,14 @@ impl Assembler {
         //     label: 0,
         // };
 
-        let file = match File::create(format!("test-data/{}.bin",file)) {
-            Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
-            Ok(f) => f,
-        };
-        let mut writer = LineWriter::new(file);
+
+        // let file = match File::create(format!("test-data/{}.bin",file)) {
+        //     Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
+        //     Ok(f) => f,
+        // };
+        // let mut writer = LineWriter::new(file);
+
+        let mut bin_insts = Vec::new();
 
         //Second pass
         let mut index = 0;
@@ -628,18 +637,25 @@ impl Assembler {
 
             // Convert to [u8] for .write()
             let b1: u8 = ((instruction >> 24) & 0xff) as u8;
+            bin_insts.push(b1);
             let b2: u8 = ((instruction >> 16) & 0xff) as u8;
+            bin_insts.push(b2);
             let b3: u8 = ((instruction >> 8) & 0xff) as u8;
+            bin_insts.push(b3);
             let b4: u8 = (instruction & 0xff) as u8;
-            let write_val: [u8;4] = [b1,b2,b3,b4];
+            bin_insts.push(b4);
+            // let write_val: [u8;4] = [b1,b2,b3,b4];
 
-            // Write to bin file, this takes an &[u8] value
-            writer.write(&write_val).expect("Not able to write binary instruction");
+            // bin_insts.push(write_val);
+
+
+            // // Write to bin file, this takes an &[u8] value
+            // writer.write(&write_val).expect("Not able to write binary instruction");
 
             index += 1;
         } 
         // panic!("Rob");
-        return index;
+        return bin_insts;
     }
 }
 

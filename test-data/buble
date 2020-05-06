@@ -1,0 +1,10 @@
+ LDR R1 0d7
+ LDR R2 0d8
+ LDR R3 0d9
+label_1 ADDU R4 R3 R7
+ LDR R4 0d0
+ LDR R5 0d3
+ CMP R4 R5
+ JMP label_1
+ ADDU R6 R4 R5
+ HALT

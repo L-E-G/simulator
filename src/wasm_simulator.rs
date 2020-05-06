@@ -12,6 +12,7 @@ extern crate serde_derive;
 use std::collections::HashMap;
 use std::io::BufReader;
 use std::fmt::Debug;
+use std::str::from_utf8;
 
 mod result;
 mod memory;
@@ -91,14 +92,35 @@ impl Simulator {
 
     /// Calls the assembler with whatever file you pass to it, after that it will
     /// load the bin file into memory and load the data into memory.
-    pub fn use_assembler_load_dram(&mut self, file: &str) -> Result<(), JsValue> {
-        let start_addr = self.control_unit.assembler.assembler(file);
-        
-        self.control_unit.load_memory_from_file(&format!("test-data/{}.bin",file));
-        self.control_unit.memory.start_addr = start_addr;
+    pub fn use_assembler_load_dram(&mut self, input: &[u8]) -> Result<(), JsValue> {
 
-        self.control_unit.load_memory_from_file("test-data/data");
-        Ok(())
+        let assembly: &str = match from_utf8(input) {
+            Err(e) => return Err(JsValue::from_serde(
+                &format!("failed to convert [u8] to &str: {}", e)).unwrap()),
+            Ok(a) => a,
+        };
+
+        let mut ass_vec: Vec<&str> = assembly.split("\n").collect();
+
+        let bin_insts = self.control_unit.assembler.assembler(ass_vec);
+        let mut array: &[u8] = &bin_insts;
+
+        match self.control_unit.memory.load_from_reader(array) {
+            Err(e) => Err(JsValue::from_serde(
+                &format!("failed to load input into DRAM: {}", e)).unwrap()),
+            Ok(_v) => Ok(()),
+        };
+
+        self.control_unit.memory.start_addr = (bin_insts.len() / 4) as u32;
+        // Ok(())
+
+        let data_vec: Vec<u8> = vec![0,0,0,1,0,0,0,4,0,0,0,2];
+        let data: &[u8] = &data_vec;
+        match self.control_unit.memory.load_from_reader(data) {
+            Err(e) => Err(JsValue::from_serde(
+                &format!("failed to load input into DRAM: {}", e)).unwrap()),
+            Ok(_v) => Ok(()),
+        }
     }
 
     /// Returns addresses and values in DRAM. First returned value is a list of
@@ -112,11 +134,41 @@ impl Simulator {
     /// See DRAM::load_from_reader() for details on the required format of
     /// the input.
     pub fn set_dram(&mut self, input: &[u8]) -> Result<(), JsValue> {
-        match self.control_unit.memory.load_from_reader(input) {
+
+        let assembly: &str = match from_utf8(input) {
+            Err(e) => return Err(JsValue::from_serde(
+                &format!("failed to convert [u8] to &str: {}", e)).unwrap()),
+            Ok(a) => a,
+        };
+
+        let mut ass_vec: Vec<&str> = assembly.split("\n").collect();
+
+        let bin_insts = self.control_unit.assembler.assembler(ass_vec);
+        let mut array: &[u8] = &bin_insts;
+
+        match self.control_unit.memory.load_from_reader(array) {
+            Err(e) => Err(JsValue::from_serde(
+                &format!("failed to load input into DRAM: {}", e)).unwrap()),
+            Ok(_v) => Ok(()),
+        };
+
+        self.control_unit.memory.start_addr = (bin_insts.len() / 4) as u32;
+        // Ok(())
+
+        let data_vec: Vec<u8> = vec![0,0,0,1,0,0,0,4,0,0,0,2];
+        let data: &[u8] = &data_vec;
+        match self.control_unit.memory.load_from_reader(data) {
             Err(e) => Err(JsValue::from_serde(
                 &format!("failed to load input into DRAM: {}", e)).unwrap()),
             Ok(_v) => Ok(()),
         }
+
+        // match self.control_unit.memory.load_from_reader(input) {
+        //     Err(e) => Err(JsValue::from_serde(
+        //         &format!("failed to load input into DRAM: {}", e)).unwrap()),
+        //     Ok(_v) => Ok(()),
+        // }
+        
     }
 
     /// Returns contents of registers.

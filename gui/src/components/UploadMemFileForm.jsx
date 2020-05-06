@@ -122,13 +122,13 @@ const UploadMemFileForm = (props) => {
 
     reader.onload = () => {
 	   try {
-		   	// console.log(reader.result);
-			// var array = new Uint8Array(reader.result);
-			// simulator.set_dram(array);
+		//    console.log(reader.result.split("\n"));
+			var array = new Uint8Array(reader.result);
+			simulator.set_dram(array);
 
-			// if (useSameFile === true) {
-			// 	localStorage.setItem(STORED_MEM_FILE_KEY, array);
-			// }
+			if (useSameFile === true) {
+				localStorage.setItem(STORED_MEM_FILE_KEY, array);
+			}
 
 			setFileLoading(false);
 			setExpanded(false);
@@ -140,14 +140,40 @@ const UploadMemFileForm = (props) => {
     };
     
     const onFileChange = (e) => {
+		setFileSelected(true);
+		setFileLoading(true);
+		setUseSameFile(useSameFileCheck);
+		
+		// reader.readAsText(e.target.files[0]);
+		reader.readAsArrayBuffer(e.target.files[0]);
+	};
+
+	var assemblyReader = new FileReader();
+
+	assemblyReader.onload = () => {
+		try {
+			var arr = new Uint8Array(reader.result);
+			simulator.use_assembler_load_dram(arr);
+
+			setFileLoading(false);
+			setExpanded(false);
+		}
+		catch(e) {
+			setError(e);
+			setFileSelected(false);
+			setFileLoading(false);
+		}
+	}
+	
+	const onAssemblyFileChange = (e) => {
 		// Robs addition
-		simulator.use_assembler_load_dram(e.target.files[0].name);
+		// simulator.use_assembler_load_dram(e.target.files[0].name);
 
 		setFileSelected(true);
 		setFileLoading(true);
 		setUseSameFile(useSameFileCheck);
 		
-		reader.readAsArrayBuffer(e.target.files[0]);
+		assemblyReader.readAsArrayBuffer(e.target.files[0]);
     };
 
     const onUseSameFileChange = () => {
@@ -174,7 +200,9 @@ const UploadMemFileForm = (props) => {
 		  setFileSelected(false);
 		  setFileLoading(false);
 	   }
-    };
+	};
+	
+
 
     const onExampleFileChanged = (e) => {
 	   setExampleFile(e.target.value);
@@ -200,7 +228,27 @@ const UploadMemFileForm = (props) => {
 			 </UseExampleButton>
 		  </Form.Group>
 	   </div>
-    );
+	);
+	
+	const AssmeblySelect = (
+		<div>
+		   <Form.Group controlId="selectAssembly">
+			  <Form.Label>Upload an assembly file to run a program</Form.Label>
+ 
+			  {fileSelected === true ?
+				<ReuploadFileInput
+					label="Load Another"
+					onChange={onAssemblyFileChange}
+					custom />
+				:
+				<InitialFileInput
+					label="Select File"
+					onChange={onAssemblyFileChange}
+					custom />
+				}
+		   </Form.Group>
+		</div>
+	 );
 
     const LoadSameFileCheckEl = (
 	   <LoadSameFileCheck
@@ -231,6 +279,10 @@ const UploadMemFileForm = (props) => {
 							  custom />
 						  }
 					   </Col>
+
+					   <ExampleSelectCol>
+						  {AssmeblySelect}
+					   </ExampleSelectCol>
 
 					   <ExampleSelectCol>
 						  {ExampleSelectEl}
