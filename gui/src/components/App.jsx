@@ -22,6 +22,7 @@ import { SecondaryButton } from "./styled";
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
 import PipelineDisplay from "./PipelineDisplay.jsx";
+import RunConfig from "./RunConfig";
 import Help from "./Help";
 import Error from "./Error";
 
@@ -132,16 +133,23 @@ class GUISimulator {
     /**
      * @param {Simulator} simulator - Base simulator instance
 	* @param {Object} stateSetters - React hook state setters, keys are: 
-	*     setRegisters, setDRAM, setPipelines, setCycleCount, setProgramStatus.
+	*     setRunConfig, setRegisters, setDRAM, setPipelines, setCycleCount,
+	*     setProgramStatus.
      */
     constructor(simulator, stateSetters) {
 	   this.simulator = simulator;
-	   
+
+	   this.setRunConfig = stateSetters.setRunConfig;
 	   this.setRegisters = stateSetters.setRegisters;
 	   this.setDRAM = stateSetters.setDRAM;
 	   this.setPipelines = stateSetters.setPipelines;
 	   this.setCycleCount = stateSetters.setCycleCount;
 	   this.setProgramStatus = stateSetters.setProgramStatus;
+    }
+
+    set_run_config(c) {
+	   this.simulator.set_run_config(c);
+	   this.setRunConfig(this.simulator.get_run_config());
     }
 
     set_registers(v) {
@@ -184,6 +192,10 @@ class GUISimulator {
 var simulator = new Simulator();
 
 const App = () => {
+    const [runConfig, setRunConfig] = useState({
+	   pipeline_enabled: true,
+	   cache_enabled: false,
+    });
     const [registers, setRegisters] = useState(simulator.get_registers());
     const [dram, setDRAM] = useState(simulator.get_dram());
     const [pipelines, setPipelines] = useState(simulator.get_pipelines());
@@ -191,7 +203,8 @@ const App = () => {
     const [programStatus, setProgramStatus] = useState(PROG_STATUS_NOT_RUNNING);
     const [error, setError] = useState(null);
 
-    var guiSimulator = new GUISimulator(simulator, { setRegisters,
+    var guiSimulator = new GUISimulator(simulator, { setRunConfig,
+										   setRegisters,
 										   setDRAM,
 										   setPipelines,
 										   setCycleCount,
@@ -278,11 +291,27 @@ const App = () => {
 
 				<Error />
 
-				<UploadMemFileForm />
-
 				<Help />
 
-				<PipelineDisplay pipelines={pipelines} />
+				<Container fluid>
+				    <Row>
+					   <Col>
+						  <UploadMemFileForm />
+					   </Col>
+
+					   <Col>
+						  <RunConfig
+							 programStatus={programStatus}
+							 runConfig={runConfig}
+						  />
+					   </Col>
+				    </Row>
+				</Container>
+
+				<PipelineDisplay
+				    pipelineStatuses={pipelines}
+				    runConfig={runConfig}
+				/>
 
 				<MemoryContainer fluid>
 				    <Row>
@@ -304,4 +333,5 @@ const App = () => {
 };
 
 export default App;
-export { SimulatorContext, ErrorContext };
+export { SimulatorContext, ErrorContext,
+	    PROG_STATUS_COMPLETED, PROG_STATUS_NOT_RUNNING, PROG_STATUS_RUNNING };

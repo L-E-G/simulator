@@ -6,35 +6,22 @@ import Container from "react-bootstrap/Container";
 import Row from "react-bootstrap/Row";
 import Col from "react-bootstrap/Col";
 import Form from "react-bootstrap/Form";
-import Card from "react-bootstrap/Card";
 import Spinner from "react-bootstrap/Spinner";
 
 import { SimulatorContext, ErrorContext } from "./App.jsx";
 import ToggleExpandButton from "./ToggleExpandButton.jsx";
 import CheckInput from "./CheckInput";
 import { PrimaryButton } from "./styled";
+import ToggleCard from "./ToggleCard";
 
 import { colors } from "../styles";
 
-const UploadCard = styled(Card)`
+const UploadCard = styled(ToggleCard)`
 max-width: 32rem;
-margin: 1rem;
-
-& > .card-body {
-    padding-bottom: 0.5rem;
-}
-`;
-
-const UploadFormCardBody = styled.div`
-padding: 0.5rem;
 `;
 
 const ExampleSelectCol = styled(Col)`
 border-left: 0.1rem solid rgba(0,0,0,.1);
-`;
-
-const UploadToggleButton = styled(ToggleExpandButton)`
-float: right;
 `;
 
 const UploadFileInput = styled(Form.File)`
@@ -208,7 +195,7 @@ const UploadMemFileForm = (props) => {
     const FormContents = () => {
 	   if (fileLoading === false) {
 		  return (
-			 <UploadFormCardBody>
+			 <React.Fragment>
 				<Container>
 				    <Row>
 					   <Col>
@@ -237,7 +224,7 @@ const UploadMemFileForm = (props) => {
 				<hr />
 
 				{LoadSameFileCheckEl}
-			 </UploadFormCardBody>
+			 </React.Fragment>
 		  );
 	   } else {
 		  return (
@@ -252,22 +239,13 @@ const UploadMemFileForm = (props) => {
     const doToggleExpand = () => {
 	   setExpanded(!expanded);
     };
-    
+
     return (
-	   <UploadCard>
-		  <Card.Body>
-			 <Card.Title>
-				<span>Memory File</span>
-
-				<UploadToggleButton
-				    expanded={expanded}
-				    doToggleExpand={doToggleExpand}/>
-			 </Card.Title>
-
-			 {expanded &&
-			  <FormContents />
-			 }
-		  </Card.Body>
+	   <UploadCard
+		  title="Memory File"
+		  startExpanded={fileSelected === false}
+	   >
+		  <FormContents />
 	   </UploadCard>
     );
 };

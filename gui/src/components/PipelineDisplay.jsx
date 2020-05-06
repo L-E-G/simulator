@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useContext } from "react";
 
 import styled from "styled-components";
 
@@ -6,13 +6,14 @@ import Table from "react-bootstrap/Table";
 
 import { Badge } from "./styled";
 import CheckInput from "./CheckInput";
+import { SimulatorContext } from "./App";
 
 const PipelineDiv = styled.div`
 margin-left: 1rem;
 margin-right: 1rem;
 `;
 
-const CurrentRecentOnlyCheckInput = styled(CheckInput)`
+const PipelineCheckInput = styled(CheckInput)`
 margin-top: 1rem;
 margin-bottom: 1rem;
 `;
@@ -23,16 +24,34 @@ text-align: center;
 
 const RECENT_ONLY_KEY = "pipelineRecentOnly";
 
-const PipelineDisplay = (props) => {
+const PIPELINE_ENABLED_HEADERS = (
+    <React.Fragment>
+	   <th>Step #</th>
+	   <th>Fetch</th>
+	   <th>Decode</th>
+	   <th>Execute</th>
+	   <th>Access Memory</th>
+	   <th>Write Back</th>
+    </React.Fragment>
+);
+
+const PIPELINE_DISABLED_HEADERS = (
+    <React.Fragment>
+	   <th>Step #</th>
+	   <th>Instruction</th>
+    </React.Fragment>
+);
+
+const PipelineDisplay = ({pipelineStatuses, runConfig}) => {
+    const guiSimulator = useContext(SimulatorContext);
+    
     let storedCurrentRecentOnly = localStorage.getItem(RECENT_ONLY_KEY) ||
 						   "true";
     const [recentOnly, setRecentOnly] = useState(
 	   storedCurrentRecentOnly === "true");
 
-    var pipelines = props.pipelines;
-
-    if (recentOnly === true && props.pipelines.length > 0) {
-	   pipelines = [props.pipelines[0]];
+    if (recentOnly === true && pipelineStatuses.length > 0) {
+	   pipelineStatuses = [pipelineStatuses[0]];
     }
 
     const onCurrentRecentOnlyChange = () => {
@@ -44,7 +63,7 @@ const PipelineDisplay = (props) => {
 	   <PipelineDiv>
 		  <h3>Pipeline</h3>
 
-		  <CurrentRecentOnlyCheckInput
+		  <PipelineCheckInput
 			 value={recentOnly}
 			 onClick={onCurrentRecentOnlyChange}
 			 label="Only Show Most Recent" />
@@ -52,20 +71,18 @@ const PipelineDisplay = (props) => {
 		  <Table bordered>
 			 <thead>
 				<tr>
-				    <th>Step #</th>
-				    <th>Fetch</th>
-				    <th>Decode</th>
-				    <th>Execute</th>
-				    <th>Access Memory</th>
-				    <th>Write Back</th>
+				    {runConfig.pipeline_enabled === true ?
+					PIPELINE_ENABLED_HEADERS :
+					PIPELINE_DISABLED_HEADERS
+				    }
 				</tr>
 			 </thead>
 			 <tbody>
-				{pipelines.map((item, i) => (
+				{pipelineStatuses.map((item, i) => (
 				    <tr key={i}>
 					   <td>{recentOnly === true ?
-						   props.pipelines.length - 1 :
-						   pipelines.length - i -1 }</td>
+						   pipelineStatuses.length - 1 :
+						   pipelineStatuses.length - i -1 }</td>
 					   {Object.keys(item).map(key => (
 						  
 						  <td key={`pipeline-cycle-${i}-${key}`}>
@@ -79,7 +96,7 @@ const PipelineDisplay = (props) => {
 			 </tbody>
 		  </Table>
 
-		  {pipelines.length === 0 ?
+		  {pipelineStatuses.length === 0 ?
 		   <NoPipelineBadgeContainer>
 			  <h3><Badge>No Pipeline Data</Badge></h3>
 		   </NoPipelineBadgeContainer> : null}
