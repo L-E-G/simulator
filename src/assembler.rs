@@ -5,9 +5,6 @@ use bit_field::BitField;
 use std::fs::{File};
 use std::io::{Read,Write,BufRead,BufReader,LineWriter};
 
-// mod instructions;
-// mod memory;
-// mod result;
 use crate::instructions::{InstructionT,ALUOp,MemoryOp,ControlOp,ConditionCodes};
 
 pub struct Assembler {}
@@ -122,27 +119,16 @@ fn tokens_length(tokens: [&str; 4]) -> u32 {
 
 fn get_condition_code(mnemonic: &str) -> u32 {
 
-    for i in 0..mnemonic.len() {
-        if mnemonic[i..i+1] == "E".to_string() {
-            return ConditionCodes::E.value();
-        }
-        if mnemonic[i..i+1] == "L".to_string() {
-            if i+1 >= mnemonic.len() {
-                return NO_CONDITION_CODE;
-            }
-            if mnemonic[i..i+2] == "T".to_string() {
-                return ConditionCodes::LT.value();
-            }
-        }
-        if mnemonic[i..i+1] == "G".to_string() {
-            if i+1 >= mnemonic.len() {
-                return NO_CONDITION_CODE;
-            }
-            if mnemonic[i..i+2] == "T".to_string() {
-                return ConditionCodes::GT.value();
-            }
-        }
+    if mnemonic.contains("LT") {
+        return ConditionCodes::LT.value();
     }
+    else if mnemonic.contains("GT") {
+        return ConditionCodes::GT.value();
+    }
+    else if mnemonic.contains("E") {
+        return ConditionCodes::E.value();
+    }
+
     return NO_CONDITION_CODE;
 }
 
@@ -154,6 +140,14 @@ impl Assembler {
     pub fn assembler(&self, content: Vec<&str>) -> Vec<u8>{
         // Define instruction mnemonics
         let mnemonics = vec![
+            InstructionTemplate{
+                mnemonic: "NOOP".to_string(),
+                itype: InstructionT::Control.value(),
+                num_operation_bits: NUM_CONTROL_OP_BITS,
+                operationI: NO_IMMEDIATE,
+                operationRD: ControlOp::Noop.value(),
+                immediate_idx: NO_IMMEDIATE,
+            },
             InstructionTemplate{
                 mnemonic: "HALT".to_string(),
                 itype: InstructionT::Control.value(),
@@ -307,7 +301,7 @@ impl Assembler {
                 immediate_idx: 3,
             },
             InstructionTemplate{
-                mnemonic: "MV".to_string(),
+                mnemonic: "MOV".to_string(),
                 itype: InstructionT::ALU.value(),
                 num_operation_bits: NUM_ALU_OP_BITS,
                 operationI: NO_IMMEDIATE,
@@ -403,19 +397,6 @@ impl Assembler {
         // let in_assembly_path = app.value_of("IN_ASSEMBLY").unwrap();
         // let out_binary_path = app.value_of("OUT_BINARY").unwrap();
 
-
-
-
-        // // Read assembly file
-        // let in_assembly_f = match File::open(format!("test-data/{}",file)) {
-        //     Err(e) => panic!("Failed to open input assembly file: {}", e),
-        //     Ok(f) => f,
-        // };
-        // let in_assembly_buf = BufReader::new(in_assembly_f);
-
-
-
-
         let mut index = 0;
         for line in content {
             // let line = match in_line {
@@ -477,8 +458,10 @@ impl Assembler {
                         inst.itype = t.itype;
                         inst.operation = t.operationRD;
 
+                        //TODO: change it so that can get condition code from instruction other than jump
+
                         // Check if includes any labels
-                        if tokens[0][..3] == "JMP".to_string() && !has_immediate && tokens[1][0..1] != "R".to_string() {
+                        if tokens[0][..=2] == "JMP".to_string() && !has_immediate && tokens[1][0..1] != "R".to_string() {
                             // Compute label's unique value
                             let label_arr = tokens[1].as_bytes();
                             let mut label: u32 = 0;
@@ -521,7 +504,7 @@ impl Assembler {
                                     1 => inst.operand1 = from_register(tokens[i as usize]),
                                     2 => inst.operand2 = from_register(tokens[i as usize]),
                                     3 => inst.operand3 = from_register(tokens[i as usize]),
-                                    _ => panic!("Failed to assign operand reg direct value"),
+                                    _ => panic!("Failed to assign operand reg addr value"),
                                 }
                                 operand_index += 1;
                             }
@@ -547,13 +530,6 @@ impl Assembler {
         //     operand3: 0,
         //     label: 0,
         // };
-
-
-        // let file = match File::create(format!("test-data/{}.bin",file)) {
-        //     Err(e) => panic!("Failed to open file to write binary instructions: {}", e),
-        //     Ok(f) => f,
-        // };
-        // let mut writer = LineWriter::new(file);
 
         let mut bin_insts = Vec::new();
 
@@ -657,10 +633,6 @@ impl Assembler {
         // panic!("Rob");
         return bin_insts;
     }
-}
-
-pub fn load_data () {
-
 }
 
 #[cfg(test)]

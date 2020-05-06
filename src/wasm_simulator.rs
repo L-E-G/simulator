@@ -141,6 +141,8 @@ impl Simulator {
             Ok(a) => a,
         };
 
+        // return Err(JsValue::from_serde(&format!(" {}", assembly)).unwrap());
+
         let mut ass_vec: Vec<&str> = assembly.split("\n").collect();
 
         let bin_insts = self.control_unit.assembler.assembler(ass_vec);
