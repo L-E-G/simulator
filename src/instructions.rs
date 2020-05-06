@@ -1489,8 +1489,8 @@ mod tests {
         const SRC_REG_IDX: usize = 5;
         const ADDR_REG_IDX: usize = 8;
         let mut instruction: u32 = 0;
-        instruction.set_bits(16..=20, (SRC_REG_IDX as u32).get_bits(0..=4));
-        instruction.set_bits(11..=15, (ADDR_REG_IDX as u32).get_bits(0..=4));
+        instruction.set_bits(15..=19, (SRC_REG_IDX as u32).get_bits(0..=4));
+        instruction.set_bits(10..=14, (ADDR_REG_IDX as u32).get_bits(0..=4));
 
         // Setup registers
         const DEST_ADDR: u32 = 34567;
@@ -1538,8 +1538,8 @@ mod tests {
         const SRC: usize = 4;
         const DEST: usize = 5;
         let mut instruction: u32 = 0;
-        instruction.set_bits(19..=23, (SRC as u32).get_bits(0..=4));
-        instruction.set_bits(14..=18, (DEST as u32).get_bits(0..=4));
+        instruction.set_bits(18..=22, (SRC as u32).get_bits(0..=4));
+        instruction.set_bits(13..=17, (DEST as u32).get_bits(0..=4));
 
         const VAL: u32 = 69;
 
@@ -1572,9 +1572,9 @@ mod tests {
         const REG2: usize = 13;
         const DEST: usize = 2;
         let mut instruction: u32 = 0;
-        instruction.set_bits(19..=23, (REG1 as u32).get_bits(0..=4));
-        instruction.set_bits(24..=28, (REG2 as u32).get_bits(0..=4));
-        instruction.set_bits(14..=18, (DEST as u32).get_bits(0..=4));
+        instruction.set_bits(18..=22, (REG1 as u32).get_bits(0..=4));
+        instruction.set_bits(23..=27, (REG2 as u32).get_bits(0..=4));
+        instruction.set_bits(13..=17, (DEST as u32).get_bits(0..=4));
 
         const VAL1: u32 = 1;
         const VAL2: u32 = 2;
@@ -1613,9 +1613,9 @@ mod tests {
         const VAL2: u32 = 2;
         const RESULT: u32 = VAL1 + VAL2;
         let mut instruction: u32 = 0;
-        instruction.set_bits(19..=23, (REG as u32).get_bits(0..=4));
-        instruction.set_bits(24..=31, VAL2.get_bits(0..=8));
-        instruction.set_bits(14..=18, (DEST as u32).get_bits(0..=4));
+        instruction.set_bits(18..=22, (REG as u32).get_bits(0..=4));
+        instruction.set_bits(23..=31, VAL2.get_bits(0..=8));
+        instruction.set_bits(13..=17, (DEST as u32).get_bits(0..=4));
 
         regs[REG] = VAL1;
 
@@ -1649,8 +1649,8 @@ mod tests {
         const VAL2: u32 = 22;
         let RESULT: u32 = ConditionCodes::LT.value();
         let mut instruction: u32 = 0;
-        instruction.set_bits(14..=28, (REG1 as u32).get_bits(0..=4));
-        instruction.set_bits(19..=23, (REG2 as u32).get_bits(0..=4));
+        instruction.set_bits(13..=27, (REG1 as u32).get_bits(0..=4));
+        instruction.set_bits(18..=22, (REG2 as u32).get_bits(0..=4));
 
         regs[REG1] = VAL1;
         regs[REG2] = VAL2;
