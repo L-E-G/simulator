@@ -13,11 +13,6 @@ path = "src/wasm_simulator.rs"
 name = "textsimulator"
 path = "src/text_simulator.rs"
 
-[[bin]]
-name = "wasmsimulator"
-path = "src/wasm_simulator.rs"
-
-
 [dependencies]
 text_io = "0.1.8"
 mockers = "0.21.0"
