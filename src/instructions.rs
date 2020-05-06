@@ -452,8 +452,8 @@ impl Instruction for Load {
         if self.mem_addr_mode == AddrMode::RegisterDirect {
             self.mem_addr = registers[instruction.get_bits(15..=19) as usize];
         } else if self.mem_addr_mode == AddrMode::Immediate {
-            self.mem_addr = instruction.get_bits(15..=19) as u32;
-            // self.mem_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(16..=31) as i32)) as u32;
+            // self.mem_addr = instruction.get_bits(15..=19) as u32;
+            self.mem_addr = (((registers[PC] + 1) as i32) + (instruction.get_bits(15..=31) as i32)) as u32;
         }
 
         return SimResult::Wait(0, ());
