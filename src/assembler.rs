@@ -670,6 +670,8 @@ mod tests {
     
     #[test]
     fn test_assembler() {
-        assembler("assembly");
+        let mut assem = Assembler::new();
+        let data_vec: Vec<&str> = vec!["LDR R6 R4","ADDU R4 R18 R2"];
+        assem.assembler(data_vec);
     }
 }
