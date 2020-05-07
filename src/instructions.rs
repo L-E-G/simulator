@@ -2,6 +2,8 @@ use bit_field::BitField;
 
 use std::fmt;
 use std::fmt::{Debug,Display};
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC,STS,LR,IHDLR,INTLR,SP};
@@ -18,7 +20,7 @@ pub trait Instruction: Display + Debug {
     fn execute(&mut self) -> SimResult<(), String>;
 
     /// Accesses memory.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String>;
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String>;
 
     /// Write results to registers.
     fn write_back(&mut self, registers: &mut Registers) -> SimResult<(), String>;
@@ -49,7 +51,7 @@ impl Instruction for Noop {
         SimResult::Wait(0, ())
     }
 
-    fn access_memory(&mut self, _memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, _memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         SimResult::Wait(0, ())
     }
 
@@ -399,7 +401,7 @@ impl Instruction for Halt {
         return SimResult::Wait(0, ());
     }
 
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -465,8 +467,8 @@ impl Instruction for Load {
     }
 
     /// Load value at mem_addr from memory into value.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
-        match memory.get(self.mem_addr) {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+        match memory.borrow_mut().get(self.mem_addr) {
             SimResult::Err(e) => SimResult::Err(
                 format!("failed to retrieve memory address {}: {}",
                         self.mem_addr, e)),
@@ -533,8 +535,8 @@ impl Instruction for Store {
     }
 
     /// Set address in memory to value.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
-        match memory.set(self.dest_addr, self.value) {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+        match memory.borrow_mut().set(self.dest_addr, self.value) {
             SimResult::Err(e) => SimResult::Err(
                 format!("Failed to store value in {}: {}", self.dest_addr, e)),
             SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
@@ -582,8 +584,8 @@ impl Instruction for Push {
     }
 
     /// Set address in memory to value.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
-        match memory.set(self.addr, self.value) {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+        match memory.borrow_mut().set(self.addr, self.value) {
             SimResult::Err(e) => SimResult::Err(
                 format!("Failed to Push value in {}: {}", self.addr, e)),
             SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
@@ -632,8 +634,8 @@ impl Instruction for Pop {
         SimResult::Wait(0, ())
     }
 
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
-        match memory.get(self.addr) {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
+        match memory.borrow_mut().get(self.addr) {
             SimResult::Err(e) => SimResult::Err(
                 format!("failed to Pop {}: {}",
                         self.addr, e)),
@@ -695,7 +697,7 @@ impl Instruction for Move {
     }
 
     /// No memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -731,7 +733,7 @@ impl ArithSign {
 
 impl Display for ArithSign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Arithmetic instruction signed")
+        write!(f, "{} signed", self.operation)
     }
 }
 
@@ -763,7 +765,7 @@ impl Instruction for ArithSign {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -799,7 +801,7 @@ impl ArithUnsign {
 
 impl Display for ArithUnsign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Arithmetic instruction unsigned")
+        write!(f, "{} unsigned", self.operation)
     }
 }
 
@@ -836,7 +838,7 @@ impl Instruction for ArithUnsign {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -883,7 +885,7 @@ impl Instruction for Comp {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -960,7 +962,7 @@ impl Instruction for AS {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -1030,7 +1032,7 @@ impl Instruction for LS {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -1099,7 +1101,7 @@ impl Instruction for ThreeOpLogic {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -1148,7 +1150,7 @@ impl Instruction for Not {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -1205,7 +1207,7 @@ impl Instruction for Jump {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -1271,7 +1273,7 @@ impl Instruction for SIH {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 
@@ -1329,9 +1331,9 @@ impl Instruction for INT {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         if self.proceed {
-            match memory.set(1111111111, self.code) {
+            match memory.borrow_mut().set(1111111111, self.code) {
                 SimResult::Err(e) => SimResult::Err(format!("Failed to store interrupt code, value in {}: {}", self.code, e)),
                 SimResult::Wait(wait, _res) => SimResult::Wait(wait, ()),
             }
@@ -1378,7 +1380,7 @@ impl Instruction for RFI {
     }
 
     /// Skipped, no memory accessing.
-    fn access_memory(&mut self, memory: &mut dyn Memory<u32, u32>) -> SimResult<(), String> {
+    fn access_memory(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> SimResult<(), String> {
         return SimResult::Wait(0, ());
     }
 

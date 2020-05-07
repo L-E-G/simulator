@@ -22,6 +22,8 @@ import { SecondaryButton } from "./styled";
 import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
 import PipelineDisplay from "./PipelineDisplay.jsx";
+import RunConfig from "./RunConfig";
+import AssemblerInput from "./AssemblerInput";
 import Help from "./Help";
 import Error from "./Error";
 
@@ -132,16 +134,29 @@ class GUISimulator {
     /**
      * @param {Simulator} simulator - Base simulator instance
 	* @param {Object} stateSetters - React hook state setters, keys are: 
-	*     setRegisters, setDRAM, setPipelines, setCycleCount, setProgramStatus.
+	*     setRunConfig, setRegisters, setCache, setDRAM, setPipelines,
+	*     setCycleCount, setProgramStatus.
      */
     constructor(simulator, stateSetters) {
 	   this.simulator = simulator;
-	   
+
+	   this.setRunConfig = stateSetters.setRunConfig;
 	   this.setRegisters = stateSetters.setRegisters;
+	   this.setCache = stateSetters.setCache;
 	   this.setDRAM = stateSetters.setDRAM;
 	   this.setPipelines = stateSetters.setPipelines;
 	   this.setCycleCount = stateSetters.setCycleCount;
 	   this.setProgramStatus = stateSetters.setProgramStatus;
+    }
+
+    set_dram_assembled(v) {
+	   this.simulator.set_dram_assembled(v);
+	   this.setDRAM(this.simulator.get_dram());
+    }
+
+    set_run_config(c) {
+	   this.simulator.set_run_config(c);
+	   this.setRunConfig(this.simulator.get_run_config());
     }
 
     set_registers(v) {
@@ -164,6 +179,7 @@ class GUISimulator {
 	   }
 	   
 	   this.setRegisters(this.simulator.get_registers());
+	   this.setCache(this.simulator.get_cache());
 	   this.setDRAM(this.simulator.get_dram());
 	   this.setPipelines(this.simulator.get_pipelines());
 	   this.setCycleCount(this.simulator.get_cycle_count());
@@ -173,6 +189,7 @@ class GUISimulator {
 	   this.simulator.finish_program();
 
 	   this.setRegisters(this.simulator.get_registers());
+	   this.setCache(this.simulator.get_cache());
 	   this.setDRAM(this.simulator.get_dram());
 	   this.setPipelines(this.simulator.get_pipelines());
 	   this.setCycleCount(this.simulator.get_cycle_count());
@@ -184,14 +201,18 @@ class GUISimulator {
 var simulator = new Simulator();
 
 const App = () => {
+    const [runConfig, setRunConfig] = useState(simulator.get_run_config());
     const [registers, setRegisters] = useState(simulator.get_registers());
+    const [cache, setCache] = useState(simulator.get_cache());
     const [dram, setDRAM] = useState(simulator.get_dram());
     const [pipelines, setPipelines] = useState(simulator.get_pipelines());
     const [cycleCount, setCycleCount] = useState(simulator.get_cycle_count());
     const [programStatus, setProgramStatus] = useState(PROG_STATUS_NOT_RUNNING);
     const [error, setError] = useState(null);
 
-    var guiSimulator = new GUISimulator(simulator, { setRegisters,
+    var guiSimulator = new GUISimulator(simulator, { setRunConfig,
+										   setRegisters,
+										   setCache,
 										   setDRAM,
 										   setPipelines,
 										   setCycleCount,
@@ -206,7 +227,11 @@ const App = () => {
     };
 
     const onRunClick = () => {
-	   guiSimulator.finish_program();
+	   try {
+		  guiSimulator.finish_program();
+	   } catch (e) {
+		  setError(e);
+	   }
     };
 
     var programStatusImg = null;
@@ -278,11 +303,31 @@ const App = () => {
 
 				<Error />
 
-				<UploadMemFileForm />
-
 				<Help />
 
-				<PipelineDisplay pipelines={pipelines} />
+				<Container fluid>
+				    <Row>
+					   <Col>
+						  <UploadMemFileForm />
+					   </Col>
+
+					   <Col>
+						  <RunConfig
+							 programStatus={programStatus}
+							 runConfig={runConfig}
+						  />
+					   </Col>
+
+					   <Col>
+						  <AssemblerInput />
+					   </Col>
+				    </Row>
+				</Container>
+
+				<PipelineDisplay
+				    pipelineStatuses={pipelines}
+				    runConfig={runConfig}
+				/>
 
 				<MemoryContainer fluid>
 				    <Row>
@@ -293,7 +338,33 @@ const App = () => {
 							 memory={registers} />
 					   </Col>
 					   <Col>
-						  <MemoryTable title="DRAM" memory={dram} />
+						  <MemoryTable
+							 title="DRAM"
+							 memory={dram}
+							 highlightedAddress={registers[PC_REG_IDX]}
+						  />
+						  {runConfig.cache_enabled === true &&
+						   <React.Fragment>
+							  <MemoryTable
+								 title="L1 Cache"
+								 memory={cache.l1.data}
+								 addressesColName="Lines (#line [tag] dirty)"
+								 keyAliases={cache.l1.aliases}
+							  />
+							  <MemoryTable
+								 title="L2 Cache"
+								 memory={cache.l2.data}
+								 addressesColName="Lines (#line [tag] dirty)"
+								 keyAliases={cache.l2.aliases}
+							  />
+							  <MemoryTable
+								 title="L3 Cache"
+								 memory={cache.l3.data}
+								 addressesColName="Lines (#line [tag] dirty)"
+								 keyAliases={cache.l3.aliases}
+							  />
+						   </React.Fragment>
+						  }
 					   </Col>
 				    </Row>
 				</MemoryContainer>
@@ -304,4 +375,5 @@ const App = () => {
 };
 
 export default App;
-export { SimulatorContext, ErrorContext };
+export { SimulatorContext, ErrorContext,
+	    PROG_STATUS_COMPLETED, PROG_STATUS_NOT_RUNNING, PROG_STATUS_RUNNING };

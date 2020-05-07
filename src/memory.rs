@@ -1,5 +1,9 @@
 #[cfg(test)] use mockers_derive::mocked;
 
+use web_sys::console;
+use wasm_bindgen::JsValue;
+use bit_field::BitField;
+
 use std::collections::HashMap;
 use std::cell::RefCell;
 use std::rc::Rc;
@@ -182,9 +186,14 @@ impl DRAM {
                     if bytes_read == 0 { // End of file
                         return Ok(());
                     } else if bytes_read != 4 { // Incorrect number of bytes read
-                        return Err(format!("Read {} bytes from buffer but \
-                                            expected 4 bytes",
-                                           bytes_read));
+                        let mut read_as: Vec<String> = Vec::new();
+                        for i in 0..bytes_read {
+                            read_as.push(buf[i].to_string());
+                        }
+                        return Err(format!("Read {} bytes as {:?} from buffer but \
+                                            expected 4 bytes, after reading {} \
+                                            words successfuly",
+                                           bytes_read, read_as, self.data.len()));
                     }
 
                     let value: u32 = (buf[3] as u32) |
@@ -254,19 +263,29 @@ impl Memory<u32, u32> for DRAM {
     }
 }
 
-
-const DM_CACHE_LINES: usize = 1024;
-
-// Direct mapped cache.
-// 10 least significant bits of an address are the index.
-// 22 most significant bits of an address are the tag.
+/// Direct mapped cache.
 pub struct DMCache {
+    /// Number of cycles it takes to access this cache.
     delay: u16,
-    lines: [DMCacheLine; DM_CACHE_LINES],
+
+    /// Number of lines in the cache.
+    num_lines: usize,
+
+    /// Number of least significant bits used for an address's cache line index.
+    idx_bits: usize,
+
+    /// Number of most significant bits used for an address's cache line tag.
+    tag_bits: usize,
+
+    /// Cache lines.
+    lines: Vec<DMCacheLine>,
+
+    /// Underlying memory which will be used to populate the cache on the event
+    /// of a cache miss.
     base: Rc<RefCell<dyn Memory<u32, u32>>>,
 }
 
-#[derive(Copy,Clone)]
+#[derive(Copy,Clone,Debug)]
 struct DMCacheLine {
     tag: u32,
     data: u32,
@@ -286,22 +305,85 @@ impl DMCacheLine {
 }
 
 impl DMCache {
-    pub fn new(delay: u16, base: Rc<RefCell<dyn Memory<u32, u32>>>) -> DMCache {
-        let lines = [DMCacheLine::new(); DM_CACHE_LINES];
+    pub fn new(delay: u16,
+               num_lines: usize,
+               base: Rc<RefCell<dyn Memory<u32, u32>>>) -> DMCache {
+        let mut lines: Vec<DMCacheLine> = vec![];
+        for i in 0..num_lines {
+            lines.push(DMCacheLine::new());
+        }
+
+        let idx_bits = (num_lines as f32).log(2.0).ceil();
+        let tag_bits = 32.0 - idx_bits;
 
         DMCache{
             delay: delay,
+            num_lines: num_lines,
+            idx_bits: idx_bits as usize,
+            tag_bits: tag_bits as usize,
             lines: lines,
             base: base,
         }
     }
 
     fn get_address_index(&self, address: u32) -> usize {
-        ((address << 22) >> 22) as usize
+        address.get_bits(0..=self.idx_bits-1) as usize
+        //((address << 22) >> 22) as usize
     }
 
     fn get_address_tag(&self, address: u32) -> u32 {
-        address >> 10
+        address >> self.idx_bits
+        //address >> 10
+    }
+
+    fn get_idx_address(&self, idx: usize, tag: u32) -> u32 {
+        let mut addr: u32 = 0;
+        addr.set_bits(0..=self.tag_bits-1, idx as u32);
+        addr.set_bits(self.tag_bits..=31, tag);
+
+        addr
+    }
+
+    pub fn inspect_valid(&self) -> HashMap<u32, u32> {
+        let mut map: HashMap<u32, u32> = HashMap::new();
+
+        for i in 0..self.num_lines {
+            let line = self.lines[i];
+
+            if !line.valid {
+                continue
+            }
+            
+            let addr: u32 = self.get_idx_address(i, line.tag);
+
+            map.insert(addr, line.data);
+        }
+
+        map
+    }
+
+    /// Keys are addresses, values are descriptions of the line.
+    pub fn inspect_valid_aliases(&self) -> HashMap<u32, String> {
+        let mut map: HashMap<u32, String> = HashMap::new();
+
+        for i in 0..self.num_lines {
+            let line = self.lines[i];
+
+            if !line.valid {
+                continue
+            }
+            
+            let addr: u32 = self.get_idx_address(i, line.tag);
+
+            let dirty_str = match line.dirty {
+                true => " d",
+                false => "",
+            };
+
+            map.insert(addr, format!("#{} [{}]{}", i, line.tag, dirty_str));
+        }
+
+        map
     }
 }
 
@@ -309,10 +391,10 @@ impl InspectableMemory<u32, u32> for DMCache {
     fn inspect(&self) -> HashMap<u32, u32> {
         let mut map: HashMap<u32, u32> = HashMap::new();
 
-        for i in 0..DM_CACHE_LINES {
+        for i in 0..self.num_lines {
             let line = self.lines[i];
             
-            let addr: u32 = ((i as u32) << 22) | line.tag;
+            let addr: u32 = self.get_idx_address(i, line.tag);
 
             map.insert(addr, line.data);
         }
@@ -427,7 +509,7 @@ impl Memory<u32, u32> for DMCache {
             // Evict current line if dirty and there is a conflict
             if line.valid && line.tag != tag && line.dirty {
                 // Write to cache layer below
-                let old_addr = (u32::from(line.tag) << 10) | (idx as u32);
+                let old_addr = self.get_idx_address(idx, line.tag);//(u32::from(line.tag) << 10) | (idx as u32);
                 let evict_res = self.base.borrow_mut().set(old_addr, line.data);
 
                 if let SimResult::Err(e) = evict_res {
