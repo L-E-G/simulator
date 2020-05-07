@@ -1406,6 +1406,7 @@ mod tests {
     fn test_load_instruction() {
         let scenario = Scenario::new();
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let mem_ref = Rc::new(RefCell::new(memory));
         let mut regs = Registers::new();
         
         // Setup registers
@@ -1460,7 +1461,7 @@ mod tests {
         // Test access memory
         scenario.expect(memory_handle.get(ADDR_VAL)
                         .and_return(SimResult::Wait(MEM_DELAY, MEM_VALUE)));
-        assert_eq!(load_instruction.access_memory(&mut memory),
+        assert_eq!(load_instruction.access_memory(mem_ref),
                    SimResult::Wait(MEM_DELAY, ()), "access_memory() == expected");
         assert_eq!(load_instruction.value, MEM_VALUE,
                    ".value == expected");
@@ -1481,6 +1482,7 @@ mod tests {
         let scenario = Scenario::new();
 
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let mem_ref = Rc::new(RefCell::new(memory));
         
         let mut regs = Registers::new();
         let mut store_instruction = Store::new(AddrMode::RegisterDirect);
@@ -1516,7 +1518,7 @@ mod tests {
         const MEM_DELAY: u16 = 45;
         scenario.expect(memory_handle.set(DEST_ADDR, SRC_VAL)
                         .and_return(SimResult::Wait(MEM_DELAY, ())));
-        assert_eq!(store_instruction.access_memory(&mut memory),
+        assert_eq!(store_instruction.access_memory(mem_ref),
                    SimResult::Wait(MEM_DELAY, ()));
 
         // Test write back
@@ -1532,6 +1534,7 @@ mod tests {
         let scenario = Scenario::new();
 
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let mem_ref = Rc::new(RefCell::new(memory));
         
         let mut regs = Registers::new();
 
@@ -1552,7 +1555,7 @@ mod tests {
         assert_eq!(move_instruction.dest, DEST, "DEST = instr.dest");
 
         assert_eq!(move_instruction.execute(), SimResult::Wait(0, ()), "execute() == expected");
-        assert_eq!(move_instruction.access_memory(&mut memory), SimResult::Wait(0, ()), "access_memory() == expected");
+        assert_eq!(move_instruction.access_memory(mem_ref), SimResult::Wait(0, ()), "access_memory() == expected");
         assert_eq!(move_instruction.write_back(&mut regs), SimResult::Wait(0, ()), "write_back() == expected");
 
         assert_eq!(regs[DEST], VAL);
@@ -1565,6 +1568,7 @@ mod tests {
         let scenario = Scenario::new();
 
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let mem_ref = Rc::new(RefCell::new(memory));
         
         let mut regs = Registers::new();
 
@@ -1593,7 +1597,7 @@ mod tests {
 
         assert_eq!(add.execute(), SimResult::Wait(0, ()), "execute() == expected");
         assert_eq!(add.result, RESULT, "execute == worked");
-        assert_eq!(add.access_memory(&mut memory), SimResult::Wait(0, ()), "access_memory() == expected");
+        assert_eq!(add.access_memory(mem_ref), SimResult::Wait(0, ()), "access_memory() == expected");
         assert_eq!(add.write_back(&mut regs), SimResult::Wait(0, ()), "write_back() == expected");
 
         assert_eq!(regs[DEST], RESULT);
@@ -1604,6 +1608,7 @@ mod tests {
         let scenario = Scenario::new();
 
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let mem_ref = Rc::new(RefCell::new(memory));
         
         let mut regs = Registers::new();
 
@@ -1629,7 +1634,7 @@ mod tests {
 
         assert_eq!(add.execute(), SimResult::Wait(0, ()), "execute() == expected");
         assert_eq!(add.result, RESULT, "execute == worked");
-        assert_eq!(add.access_memory(&mut memory), SimResult::Wait(0, ()), "access_memory() == expected");
+        assert_eq!(add.access_memory(mem_ref), SimResult::Wait(0, ()), "access_memory() == expected");
         assert_eq!(add.write_back(&mut regs), SimResult::Wait(0, ()), "write_back() == expected");
 
         assert_eq!(regs[DEST], RESULT);
@@ -1640,6 +1645,7 @@ mod tests {
         let scenario = Scenario::new();
 
         let (mut memory, memory_handle) = scenario.create_mock_for::<dyn Memory<u32, u32>>();
+        let mem_ref = Rc::new(RefCell::new(memory));
         
         let mut regs = Registers::new();
 
@@ -1662,7 +1668,7 @@ mod tests {
         assert_eq!(comp.op2, VAL2, "OP2 == instr.op2");
 
         assert_eq!(comp.execute(), SimResult::Wait(0, ()), "execute() == expected");
-        assert_eq!(comp.access_memory(&mut memory), SimResult::Wait(0, ()), "access_memory() == expected");
+        assert_eq!(comp.access_memory(mem_ref), SimResult::Wait(0, ()), "access_memory() == expected");
         assert_eq!(comp.write_back(&mut regs), SimResult::Wait(0, ()), "write_back() == expected");
 
         assert_eq!(regs[STS], RESULT);

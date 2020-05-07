@@ -10,6 +10,7 @@ pub use crate::instructions::Instruction;
 pub use crate::control_unit::ControlUnit;
 
 fn main() {
+    /*
     let args: Vec<_> = env::args().collect();
     if args.len() > 2 {
         panic!("Usage: {} [gui]", args[0]);
@@ -43,4 +44,5 @@ fn main() {
             }
         }
     }
+*/
 }
