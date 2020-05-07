@@ -3,7 +3,7 @@ use clap::{Arg, App};
 use bit_field::BitField;
 
 use std::fs::{File};
-use std::io::{Read,Write,BufRead,BufReader,LineWriter};
+use std::io::{Cursor,Read,Write,BufRead,BufReader,LineWriter};
 
 use crate::instructions::{InstructionT,ALUOp,MemoryOp,ControlOp,ConditionCodes};
 
@@ -375,7 +375,7 @@ impl Assembler {
     }
 
     /// Transform lines of assembly into words of binary.
-    pub fn assemble(&self, in_reader: impl Read) -> Vec<u8> {
+    pub fn assemble(&self, in_reader: impl Read) -> Result<Vec<u8>, String> {
         let in_buf = BufReader::new(in_reader);
         
         let mut first_pass = Vec::new();
@@ -384,7 +384,7 @@ impl Assembler {
         let mut index = 0;
         for line_res in in_buf.lines() {
             let line = match line_res {
-                Err(e) => panic!(format!("Failed to read line number {}: {}",
+                Err(e) => return Err(format!("Failed to read line number {}: {}",
                                  index + 1, e)),
                 Ok(l) => l,
             };
@@ -481,7 +481,9 @@ impl Assembler {
                                     1 => inst.operand1 = from_immediate(tokens[i as usize]),
                                     2 => inst.operand2 = from_immediate(tokens[i as usize]),
                                     3 => inst.operand3 = from_immediate(tokens[i as usize]),
-                                    _ => panic!("Failed to assign operand immediate value"),
+                                    _ => return Err(
+                                        format!("Failed to assign operand \
+                                                 immediate value")),
                                 }
                                 operand_index += 1;
                             } else {
@@ -489,7 +491,9 @@ impl Assembler {
                                     1 => inst.operand1 = from_register(tokens[i as usize]),
                                     2 => inst.operand2 = from_register(tokens[i as usize]),
                                     3 => inst.operand3 = from_register(tokens[i as usize]),
-                                    _ => panic!("Failed to assign operand reg addr value"),
+                                    _ => return Err(
+                                        format!("Failed to assign operand reg \
+                                                 addr value")),
                                 }
                                 operand_index += 1;
                             }
@@ -616,7 +620,7 @@ impl Assembler {
             index += 1;
         } 
         // panic!("Rob");
-        return bin_insts;
+        return Ok(bin_insts);
     }
 }
 
@@ -680,7 +684,7 @@ mod tests {
     #[test]
     fn test_assembler() {
         let mut assem = Assembler::new();
-        let data_vec: Vec<&str> = vec!["LDR R6 R4","ADDU R4 R18 R2"];
-        assem.assembler(data_vec);
+        let data = "LDR R6 R4\nADDU R4 R18 R2".as_bytes();
+        assem.assemble(data);
     }
 }

@@ -10,7 +10,7 @@ use web_sys::console;
 extern crate serde_derive;
 
 use std::collections::HashMap;
-use std::io::BufReader;
+use std::io::{Cursor,BufReader};
 use std::fmt::Debug;
 use std::str::from_utf8;
 
@@ -95,13 +95,17 @@ impl Simulator {
 
     /// Assemble input and set DRAM to the resulting binary.
     pub fn set_dram_assembled(&mut self, input: &str) -> Result<(), JsValue> {
-        let bin = match self.assembler.assemble(input) {
+        let bin = match self.assembler.assemble(input.as_bytes()) {
             Err(e) => return Err(JsValue::from_serde(
                 &format!("failed to assemble input: {}", e)).unwrap()),
             Ok(v) => v,
         };
 
-        self.set_dram(&bin)
+        match self.control_unit.memory.load_from_reader(&mut Cursor::new(bin)) {
+            Err(e) => Err(JsValue::from_serde(
+                &format!("failed to load input into DRAM: {}", e)).unwrap()),
+            Ok(_v) => Ok(()),
+        }
     }
 
     /// Returns addresses and values in DRAM. First returned value is a list of
