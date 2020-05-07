@@ -1,3 +1,4 @@
+extern crate clap;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::convert::{IntoWasmAbi,FromWasmAbi,WasmSlice};
 use wasm_bindgen::JsValue;
@@ -9,16 +10,19 @@ use web_sys::console;
 extern crate serde_derive;
 
 use std::collections::HashMap;
-use std::io::BufReader;
+use std::io::{Cursor,BufReader};
 use std::fmt::Debug;
+use std::str::from_utf8;
 
 mod result;
 mod memory;
 mod instructions;
 mod control_unit;
+mod assembler;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
 use crate::memory::{Memory,InspectableMemory};
+use crate::assembler::Assembler;
 
 /// Represents the state of stages in the pipeline.
 /// Values are names of the instruction in each stage.
@@ -70,6 +74,7 @@ impl PipelineStatus {
 #[wasm_bindgen]
 pub struct Simulator {
     control_unit: ControlUnit,
+    assembler: Assembler,
     pipeline_statuses: Vec<PipelineStatus>,
 }
 
@@ -83,7 +88,23 @@ impl Simulator {
 
         Simulator{
             control_unit: ControlUnit::new(),
+            assembler: Assembler::new(),
             pipeline_statuses: vec![],
+        }
+    }
+
+    /// Assemble input and set DRAM to the resulting binary.
+    pub fn set_dram_assembled(&mut self, input: &str) -> Result<(), JsValue> {
+        let bin = match self.assembler.assemble(input.as_bytes()) {
+            Err(e) => return Err(JsValue::from_serde(
+                &format!("failed to assemble input: {}", e)).unwrap()),
+            Ok(v) => v,
+        };
+
+        match self.control_unit.memory.load_from_reader(&mut Cursor::new(bin)) {
+            Err(e) => Err(JsValue::from_serde(
+                &format!("failed to load input into DRAM: {}", e)).unwrap()),
+            Ok(_v) => Ok(()),
         }
     }
 
