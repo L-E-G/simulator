@@ -3,9 +3,11 @@ use wasm_bindgen::prelude::*;
 
 use std::boxed::Box;
 use std::fmt;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 use crate::result::SimResult;
-use crate::memory::{Memory,DRAM,Registers,PC};
+use crate::memory::{Memory,DRAM,DMCache,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,Push,Pop,
     ArithMode,ALUOp,Move,ArithSign,ArithUnsign,
@@ -28,7 +30,7 @@ pub struct ControlUnit {
     pub registers: Registers,
 
     /// Memory system.
-    pub memory: DRAM,
+    pub memory: Rc<RefCell<DMCache>>,
 
     /// Indicates that the processor has loaded the first instruction yet.
     pub first_instruction_loaded: bool,
@@ -115,13 +117,13 @@ Memory     :
 
 impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new() -> ControlUnit {
+    pub fn new(memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> ControlUnit {
         ControlUnit{
             pipeline_enabled: true,
             cache_enabled: true,
             cycle_count: 0,
             registers: Registers::new(),
-            memory: DRAM::new(100),
+            memory: memory,
             first_instruction_loaded: false,
             halt_encountered: false,
             no_pipeline_instruction: None,
@@ -137,7 +139,7 @@ impl ControlUnit {
     /// Loads a memory file into the control unit's memory. See
     /// DRAM::load_from_file() for details on the expected file structure.
     pub fn load_memory_from_file(&mut self, f: &str) -> Result<(), String> {
-        self.memory.load_from_file(f)
+        self.memory.base.load_from_file(f)
     }
 
     /// Step one instruction through the processor. Stores resulting state in self.
@@ -263,7 +265,7 @@ impl ControlUnit {
         match &mut self.execute_instruction {
             None => self.access_mem_instruction = None,
             Some(exec_inst) => {
-                match exec_inst.access_memory(&mut self.memory) {
+                match exec_inst.access_memory(self.memory.borrow_mut()) {
                     SimResult::Err(e) => return Err(
                         format!("Failed to access memory for instruction: {}",
                                 e)),
@@ -315,7 +317,7 @@ impl ControlUnit {
     
         // Fetch stage
         if !self.halt_encountered {
-            match self.memory.get(self.registers[PC]) {
+            match self.memory.borrow().get(self.registers[PC]) {
                 SimResult::Err(e) => return Err(
                     format!("Failed to retrieve instruction from address {}: {}",
                             self.registers[PC], e)),

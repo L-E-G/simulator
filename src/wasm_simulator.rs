@@ -13,6 +13,8 @@ use std::collections::HashMap;
 use std::io::{Cursor,BufReader};
 use std::fmt::Debug;
 use std::str::from_utf8;
+use std::cell::RefCell;
+use std::rc::Rc;
 
 mod result;
 mod memory;
@@ -21,7 +23,7 @@ mod control_unit;
 mod assembler;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
-use crate::memory::{Memory,InspectableMemory};
+use crate::memory::{DMCache,DRAM,Memory,InspectableMemory};
 use crate::assembler::Assembler;
 
 /// Run configuration which determines how programs run in the simulator.
@@ -38,6 +40,8 @@ pub struct RunConfig {
 /// The run configuration should be set before step() is ever called.
 #[wasm_bindgen]
 pub struct Simulator {
+    cache: Rc<RefCell<DMCache>>,
+    dram: Rc<RefCell<DRAM>>,
     control_unit: ControlUnit,
     assembler: Assembler,
     
@@ -57,8 +61,13 @@ impl Simulator {
         // Setup panic logging hook
         console_error_panic_hook::set_once();
 
+        let dram = Rc::new(RefCell::new(DRAM::new(100)));
+        let cache = Rc::new(RefCell::new(DMCache::new(10, dram)));
+
         Simulator{
-            control_unit: ControlUnit::new(),
+            cache: cache,
+            dram: dram,
+            control_unit: ControlUnit::new(cache),
             assembler: Assembler::new(),
             pipeline_statuses: vec![],
         }
@@ -117,7 +126,7 @@ impl Simulator {
             Ok(v) => v,
         };
 
-        match self.control_unit.memory.load_from_reader(&mut Cursor::new(bin)) {
+        match self.dram.borrow_mut().load_from_reader(&mut Cursor::new(bin)) {
             Err(e) => Err(JsValue::from_serde(
                 &format!("failed to load input into DRAM: {}", e)).unwrap()),
             Ok(_v) => Ok(()),
@@ -146,14 +155,14 @@ impl Simulator {
     /// addresses. Second returned value is a list of values corresponding to
     /// the addresses.
     pub fn get_dram(&self) -> JsValue {
-        JsValue::from_serde(&self.control_unit.memory.inspect()).unwrap()
+        JsValue::from_serde(&self.dram.borrow().inspect()).unwrap()
     }
 
     /// Sets the contents of DRAM based on binary input.
     /// See DRAM::load_from_reader() for details on the required format of
     /// the input.
     pub fn set_dram(&mut self, input: &[u8]) -> Result<(), JsValue> {
-        match self.control_unit.memory.load_from_reader(input) {
+        match self.dram.borrow_mut().load_from_reader(input) {
             Err(e) => Err(JsValue::from_serde(
                 &format!("failed to load input into DRAM: {}", e)).unwrap()),
             Ok(_v) => Ok(()),
