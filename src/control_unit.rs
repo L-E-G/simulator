@@ -162,44 +162,39 @@ impl ControlUnit {
         
         // Fetch instruction
         let mut ibits: u32 = 0;
-        
-        match self.memory.get(self.registers[PC]) {
+
+        let mut no_pipeline_inst = match self.memory.get(self.registers[PC]) {
             SimResult::Err(e) => return Err(
                 format!("Failed to retrieve instruction from address {}: {}",
                         self.registers[PC], e)),
             SimResult::Wait(wait, fetched_bits) => {
-                // End program execution if instruction is 0
-                if fetched_bits == 0 {
-                    self.no_pipeline_instruction = None;
-                    return Ok(self.program_is_running())
-                } else {
-                    ibits = fetched_bits;
-                }
+                // Figure out which instruction the bits represent by
+                // looking at the type and operation code.
+                let icreate = self.instruction_factory(fetched_bits);
 
                 // Set state
                 self.cycle_count += wait as u32;
+                ibits = fetched_bits;
+
+                match icreate {
+                    Err(e) => return Err(format!("Failed to determine type of \
+                                                  instruction for bits {}: {}",
+                                                 fetched_bits, e)),
+                    Ok(v) => v,
+                }
             },
         };
-
+        
         // Decode instruction
-        let icreate = self.instruction_factory(ibits);
-
-        // Run instruction specific decode
-        let mut no_pipeline_inst = match icreate {
-            Err(e) => return Err(format!("Failed to determine type of \
-                                          instruction for bits {}: {}",
-                                         ibits, e)),
-            Ok(mut inst_box) => match (*inst_box).decode(ibits,
-                                                         &self.registers) {
-                SimResult::Err(e) => return Err(
-                    format!("Failed to decode instruction {}: {}",
-                            ibits, e)),
-                SimResult::Wait(wait, _v) => {
-                    // Update state
-                    self.cycle_count += wait as u32;
-
-                    inst_box
-                },
+        match no_pipeline_inst.decode(self.fetch_instruction_bits,
+                                &self.registers) {
+            SimResult::Err(e) => return Err(
+                format!("Failed to decode instruction: {}",
+                        e)),
+            SimResult::Wait(wait, _v) => {
+                // Update state
+                self.cycle_count += wait as u32;
+                
             },
         };
 
@@ -329,7 +324,6 @@ impl ControlUnit {
                     // looking at the type and operation code.
                     let icreate = self.instruction_factory(ibits);
 
-                    // Run instruction specific decode
                     self.fetch_instruction = match icreate {
                         Err(e) => return Err(format!("Failed to determine type of \
                                                       instruction for bits {}: {}",
