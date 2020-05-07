@@ -1,0 +1,7 @@
+label_1 STR R2 0d9
+ LDR R4 0d0
+ LDR R5 0d3
+ CMP R4 R5
+ JMP label_1
+ ADDU R6 R4 R5
+ HALT

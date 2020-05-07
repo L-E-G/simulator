@@ -46,6 +46,21 @@ pub const SP: usize = 30;
 /// Link register index
 pub const LR: usize = 31;
 
+
+/// Start of the program memory
+// pub struct Memory_Start {
+//     PROG_MEM_START: u32,
+// }
+
+// impl Memory_Start {
+//     pub fn new() -> Memory_Start {
+//         Memory_Start {
+//             PROG_MEM_START: 0,
+//         }
+//     }
+    
+// }
+
 impl Registers {
     pub fn new() -> Registers {
         Registers{
