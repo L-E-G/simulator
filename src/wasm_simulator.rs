@@ -22,6 +22,7 @@ mod assembler;
 use crate::control_unit::ControlUnit;
 use crate::result::SimResult;
 use crate::memory::{Memory,InspectableMemory};
+use crate::assembler::Assembler;
 
 /// Represents the state of stages in the pipeline.
 /// Values are names of the instruction in each stage.
@@ -73,6 +74,7 @@ impl PipelineStatus {
 #[wasm_bindgen]
 pub struct Simulator {
     control_unit: ControlUnit,
+    assembler: Assembler,
     pipeline_statuses: Vec<PipelineStatus>,
 }
 
@@ -86,8 +88,20 @@ impl Simulator {
 
         Simulator{
             control_unit: ControlUnit::new(),
+            assembler: Assembler::new(),
             pipeline_statuses: vec![],
         }
+    }
+
+    /// Assemble input and set DRAM to the resulting binary.
+    pub fn set_dram_assembled(&mut self, input: &str) -> Result<(), JsValue> {
+        let bin = match self.assembler.assemble(input) {
+            Err(e) => return Err(JsValue::from_serde(
+                &format!("failed to assemble input: {}", e)).unwrap()),
+            Ok(v) => v,
+        };
+
+        self.set_dram(&bin)
     }
 
     /// Returns addresses and values in DRAM. First returned value is a list of

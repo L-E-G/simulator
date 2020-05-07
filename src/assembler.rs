@@ -7,7 +7,9 @@ use std::io::{Read,Write,BufRead,BufReader,LineWriter};
 
 use crate::instructions::{InstructionT,ALUOp,MemoryOp,ControlOp,ConditionCodes};
 
-pub struct Assembler {}
+pub struct Assembler {
+    mnemonics: Vec<InstructionTemplate>,
+}
 
 /// A template for an instructions bit pattern.
 struct InstructionTemplate {
@@ -134,275 +136,258 @@ fn get_condition_code(mnemonic: &str) -> u32 {
 
 impl Assembler {
     pub fn new() -> Assembler {
-        Assembler{}
+        Assembler{
+            mnemonics: vec![
+                InstructionTemplate{
+                    mnemonic: "NOOP".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: ControlOp::Noop.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "HALT".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: ControlOp::Halt.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "STR".to_string(),
+                    itype: InstructionT::Memory.value(),
+                    num_operation_bits: NUM_MEMORY_OP_BITS,
+                    operationI: MemoryOp::StoreI.value(),
+                    operationRD: MemoryOp::StoreRD.value(),
+                    immediate_idx: 2,
+                },
+                InstructionTemplate{
+                    mnemonic: "LDR".to_string(),
+                    itype: InstructionT::Memory.value(),
+                    num_operation_bits: NUM_MEMORY_OP_BITS,
+                    operationI: MemoryOp::LoadI.value(),
+                    operationRD: MemoryOp::LoadRD.value(),
+                    immediate_idx: 2,
+                },
+                InstructionTemplate{
+                    mnemonic: "PUSH".to_string(),
+                    itype: InstructionT::Memory.value(),
+                    num_operation_bits: NUM_MEMORY_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: MemoryOp::Push.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "POP".to_string(),
+                    itype: InstructionT::Memory.value(),
+                    num_operation_bits: NUM_MEMORY_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: MemoryOp::Pop.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "JMP".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: ControlOp::JmpI.value(),
+                    operationRD: ControlOp::JmpRD.value(),
+                    immediate_idx: 1,
+                },
+                InstructionTemplate{
+                    mnemonic: "JMPS".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: ControlOp::JmpSI.value(),
+                    operationRD: ControlOp::JmpSRD.value(),
+                    immediate_idx: 1,
+                },
+                InstructionTemplate{
+                    mnemonic: "JMPGT".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: ControlOp::JmpI.value(),
+                    operationRD: ControlOp::JmpRD.value(),
+                    immediate_idx: 1,
+                },
+                InstructionTemplate{
+                    mnemonic: "JMPLT".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: ControlOp::JmpI.value(),
+                    operationRD: ControlOp::JmpRD.value(),
+                    immediate_idx: 1,
+                },
+                InstructionTemplate{
+                    mnemonic: "JMPE".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: ControlOp::JmpI.value(),
+                    operationRD: ControlOp::JmpRD.value(),
+                    immediate_idx: 1,
+                },
+                InstructionTemplate{
+                    mnemonic: "JMPI".to_string(),
+                    itype: InstructionT::Control.value(),
+                    num_operation_bits: NUM_CONTROL_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: ControlOp::RFI.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "ADDU".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::AddUII.value(),
+                    operationRD: ALUOp::AddUIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "ADDS".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::AddSII.value(),
+                    operationRD: ALUOp::AddSIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "SUBU".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::SubUII.value(),
+                    operationRD: ALUOp::SubUIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "SUBS".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::SubSII.value(),
+                    operationRD: ALUOp::SubSIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "MULU".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::MulUII.value(),
+                    operationRD: ALUOp::MulUIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "MULS".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::MulSII.value(),
+                    operationRD: ALUOp::MulSIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "DIVU".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::DivUII.value(),
+                    operationRD: ALUOp::DivUIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "DIVS".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::DivSII.value(),
+                    operationRD: ALUOp::DivSIRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "MOV".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: ALUOp::Move.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "CMP".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: ALUOp::Comp.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+                InstructionTemplate{
+                    mnemonic: "ASL".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::ASLI.value(),
+                    operationRD: ALUOp::ASLRD.value(),
+                    immediate_idx: 2,
+                },
+                InstructionTemplate{
+                    mnemonic: "ASR".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::ASRI.value(),
+                    operationRD: ALUOp::ASRRD.value(),
+                    immediate_idx: 2,
+                },
+                InstructionTemplate{
+                    mnemonic: "LSL".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::LSLI.value(),
+                    operationRD: ALUOp::LSRRD.value(),
+                    immediate_idx: 2,
+                },
+                InstructionTemplate{
+                    mnemonic: "AND".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::AndI.value(),
+                    operationRD: ALUOp::AndRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "OR".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::OrI.value(),
+                    operationRD: ALUOp::OrRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "XOR".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: ALUOp::XorI.value(),
+                    operationRD: ALUOp::XorRD.value(),
+                    immediate_idx: 3,
+                },
+                InstructionTemplate{
+                    mnemonic: "NOT".to_string(),
+                    itype: InstructionT::ALU.value(),
+                    num_operation_bits: NUM_ALU_OP_BITS,
+                    operationI: NO_IMMEDIATE,
+                    operationRD: ALUOp::Not.value(),
+                    immediate_idx: NO_IMMEDIATE,
+                },
+            ],
+        }
     }
 
-    pub fn assembler(&self, content: Vec<&str>) -> Vec<u8>{
-        // Define instruction mnemonics
-        let mnemonics = vec![
-            InstructionTemplate{
-                mnemonic: "NOOP".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: ControlOp::Noop.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "HALT".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: ControlOp::Halt.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "STR".to_string(),
-                itype: InstructionT::Memory.value(),
-                num_operation_bits: NUM_MEMORY_OP_BITS,
-                operationI: MemoryOp::StoreI.value(),
-                operationRD: MemoryOp::StoreRD.value(),
-                immediate_idx: 2,
-            },
-            InstructionTemplate{
-                mnemonic: "LDR".to_string(),
-                itype: InstructionT::Memory.value(),
-                num_operation_bits: NUM_MEMORY_OP_BITS,
-                operationI: MemoryOp::LoadI.value(),
-                operationRD: MemoryOp::LoadRD.value(),
-                immediate_idx: 2,
-            },
-            InstructionTemplate{
-                mnemonic: "PUSH".to_string(),
-                itype: InstructionT::Memory.value(),
-                num_operation_bits: NUM_MEMORY_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: MemoryOp::Push.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "POP".to_string(),
-                itype: InstructionT::Memory.value(),
-                num_operation_bits: NUM_MEMORY_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: MemoryOp::Pop.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "JMP".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: ControlOp::JmpI.value(),
-                operationRD: ControlOp::JmpRD.value(),
-                immediate_idx: 1,
-            },
-            InstructionTemplate{
-                mnemonic: "JMPS".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: ControlOp::JmpSI.value(),
-                operationRD: ControlOp::JmpSRD.value(),
-                immediate_idx: 1,
-            },
-            InstructionTemplate{
-                mnemonic: "JMPGT".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: ControlOp::JmpI.value(),
-                operationRD: ControlOp::JmpRD.value(),
-                immediate_idx: 1,
-            },
-            InstructionTemplate{
-                mnemonic: "JMPLT".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: ControlOp::JmpI.value(),
-                operationRD: ControlOp::JmpRD.value(),
-                immediate_idx: 1,
-            },
-            InstructionTemplate{
-                mnemonic: "JMPE".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: ControlOp::JmpI.value(),
-                operationRD: ControlOp::JmpRD.value(),
-                immediate_idx: 1,
-            },
-            InstructionTemplate{
-                mnemonic: "JMPI".to_string(),
-                itype: InstructionT::Control.value(),
-                num_operation_bits: NUM_CONTROL_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: ControlOp::RFI.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "ADDU".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::AddUII.value(),
-                operationRD: ALUOp::AddUIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "ADDS".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::AddSII.value(),
-                operationRD: ALUOp::AddSIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "SUBU".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::SubUII.value(),
-                operationRD: ALUOp::SubUIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "SUBS".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::SubSII.value(),
-                operationRD: ALUOp::SubSIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "MULU".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::MulUII.value(),
-                operationRD: ALUOp::MulUIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "MULS".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::MulSII.value(),
-                operationRD: ALUOp::MulSIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "DIVU".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::DivUII.value(),
-                operationRD: ALUOp::DivUIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "DIVS".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::DivSII.value(),
-                operationRD: ALUOp::DivSIRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "MOV".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: ALUOp::Move.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "CMP".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: ALUOp::Comp.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-            InstructionTemplate{
-                mnemonic: "ASL".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::ASLI.value(),
-                operationRD: ALUOp::ASLRD.value(),
-                immediate_idx: 2,
-            },
-            InstructionTemplate{
-                mnemonic: "ASR".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::ASRI.value(),
-                operationRD: ALUOp::ASRRD.value(),
-                immediate_idx: 2,
-            },
-            InstructionTemplate{
-                mnemonic: "LSL".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::LSLI.value(),
-                operationRD: ALUOp::LSRRD.value(),
-                immediate_idx: 2,
-            },
-            InstructionTemplate{
-                mnemonic: "AND".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::AndI.value(),
-                operationRD: ALUOp::AndRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "OR".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::OrI.value(),
-                operationRD: ALUOp::OrRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "XOR".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: ALUOp::XorI.value(),
-                operationRD: ALUOp::XorRD.value(),
-                immediate_idx: 3,
-            },
-            InstructionTemplate{
-                mnemonic: "NOT".to_string(),
-                itype: InstructionT::ALU.value(),
-                num_operation_bits: NUM_ALU_OP_BITS,
-                operationI: NO_IMMEDIATE,
-                operationRD: ALUOp::Not.value(),
-                immediate_idx: NO_IMMEDIATE,
-            },
-        ];
+    /// Transform lines of assembly into words of binary.
+    pub fn assemble(&self, in_reader: impl Read) -> Vec<u8> {
+        let in_buf = BufReader::new(in_reader);
         
         let mut first_pass = Vec::new();
         let mut labels = Vec::new();
         
-        // Parse command line arguments
-        // let app = App::new("LEG assembler")
-        //     .about("Converts LEG assembly into the LEG binary format")
-        //     .arg(Arg::with_name("IN_ASSEMBLY")
-        //          .short("i")
-        //          .long("in")
-        //          .help("Input LEG assembly file")
-        //          .takes_value(true)
-        //          .required(true))
-        //     .arg(Arg::with_name("OUT_BINARY")
-        //          .short("o")
-        //          .long("out")
-        //          .help("Output LEG binary file")
-        //          .takes_value(true)
-        //          .required(true))
-        //     .get_matches();
-
-        // let in_assembly_path = app.value_of("IN_ASSEMBLY").unwrap();
-        // let out_binary_path = app.value_of("OUT_BINARY").unwrap();
-
         let mut index = 0;
-        for line in content {
-            // let line = match in_line {
-            //     Err(e) => panic!("Failed to read line number {}: {}",index + 1,e).unwrap(),
-            //     Ok(l) => l,
-            // };
+        for line_res in in_buf.lines() {
+            let line = match line_res {
+                Err(e) => panic!(format!("Failed to read line number {}: {}",
+                                 index + 1, e)),
+                Ok(l) => l,
+            };
 
             if line.len() > 0 {
                 // Parse the line
@@ -451,7 +436,7 @@ impl Assembler {
                 };
 
                 // Jump through template table to find the template that matches the current line
-                for t in &mnemonics {
+                for t in &self.mnemonics {
                     // Find correct template
                     if tokens[0] == t.mnemonic {
                         // Set initial values
@@ -634,6 +619,58 @@ impl Assembler {
         return bin_insts;
     }
 }
+
+/*
+fn main() {
+    // Parse command line arguments
+    let app = App::new("LEG assembler")
+        .about("Converts LEG assembly into the LEG binary format")
+        .arg(Arg::with_name("IN_ASSEMBLY")
+             .short("i")
+             .long("in")
+             .help("Input LEG assembly file")
+             .takes_value(true)
+             .required(true))
+        .arg(Arg::with_name("OUT_BINARY")
+             .short("o")
+             .long("out")
+             .help("Output LEG binary file")
+             .takes_value(true)
+             .required(true))
+        .get_matches();
+    
+    let in_assembly_path = app.value_of("IN_ASSEMBLY").unwrap();
+    let out_binary_path = app.value_of("OUT_BINARY").unwrap();
+
+    // Read assembly file
+    let in_assembly_f = match File::open(in_assembly_path) {
+        Err(e) => panic!("Failed to open input assembly file: {}", e),
+        Ok(f) => f,
+    };
+    let in_assembly_buf = BufReader::new(in_assembly_f);
+
+    // Assemble
+    println!("Assembling");
+    
+    let assembler = Assembler::new();
+    let out_binary = assembler.assemble(in_assembly_buf);
+
+    println!("Assembled");
+
+    // Write binary file
+    let mut out_binary_f = match File::open(out_binary_path) {
+        Err(e) => panic!("Failed to open output binary file: {}", e),
+        Ok(f) => f,
+    };
+    
+    match out_binary_f.write_all(&out_binary) {
+        Err(e) => panic!("Failed to write output binary file: {}", e),
+        Ok(_v) => (),
+    };
+
+    println!("Wrote output to {}", out_binary_path);
+}
+*/
 
 #[cfg(test)]
 mod tests {
