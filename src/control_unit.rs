@@ -43,7 +43,10 @@ pub struct ControlUnit {
     pub no_pipeline_instruction: Option<Box<dyn Instruction>>,
 
     /// Instruction which resulted from the fetch stage of the pipeline.
-    pub fetch_instruction: Option<u32>,
+    pub fetch_instruction: Option<Box<dyn Instruction>>,
+
+    /// Bits associated with fetch stage of pipeline.
+    fetch_instruction_bits: u32,
 
     /// Instruction currently in the decode stage of the pipeline.
     pub decode_instruction: Option<Box<dyn Instruction>>,
@@ -122,7 +125,8 @@ impl ControlUnit {
             first_instruction_loaded: false,
             halt_encountered: false,
             no_pipeline_instruction: None,
-            fetch_instruction: None,            
+            fetch_instruction: None,
+            fetch_instruction_bits: 0,
             decode_instruction: None,
             execute_instruction: None,
             access_mem_instruction: None,
@@ -295,34 +299,25 @@ impl ControlUnit {
         };
 
         // Decode stage
-        match self.fetch_instruction {
+        match &mut self.fetch_instruction {
             None => self.decode_instruction = None,
             Some(fetch_inst) => {
-                // Figure out which instruction the bits represent by
-                // looking at the type and operation code.
-                let icreate = self.instruction_factory(fetch_inst);
-
-                // Run instruction specific decode
-                self.decode_instruction = match icreate {
-                    Err(e) => return Err(format!("Failed to determine type of \
-                                                  instruction for bits {}: {}",
-                                                 fetch_inst, e)),
-                    Ok(mut inst_box) => match (*inst_box).decode(fetch_inst,
-                                                                 &self.registers) {
-                        SimResult::Err(e) => return Err(
-                            format!("Failed to decode instruction {}: {}",
-                                    fetch_inst, e)),
-                        SimResult::Wait(wait, _v) => {
-                            // Update state
-                            self.cycle_count += wait as u32;
-
-                            Some(inst_box)
-                        },
+                match fetch_inst.decode(self.fetch_instruction_bits,
+                                        &self.registers) {
+                    SimResult::Err(e) => return Err(
+                        format!("Failed to decode instruction {}: {}",
+                                fetch_inst, e)),
+                    SimResult::Wait(wait, _v) => {
+                        // Update state
+                        self.cycle_count += wait as u32;
+                        
                     },
                 };
+
+                self.decode_instruction = self.fetch_instruction.take();
             },
         };
-        
+    
         // Fetch stage
         if !self.halt_encountered {
             match self.memory.get(self.registers[PC]) {
@@ -330,19 +325,24 @@ impl ControlUnit {
                     format!("Failed to retrieve instruction from address {}: {}",
                             self.registers[PC], e)),
                 SimResult::Wait(wait, ibits) => {
-                    // End program execution if instruction is 0
-                    if ibits == 0 {
-                        self.fetch_instruction = None;
-                    } else {
-                        self.fetch_instruction = Some(ibits);
-                    }
+                    // Figure out which instruction the bits represent by
+                    // looking at the type and operation code.
+                    let icreate = self.instruction_factory(ibits);
+
+                    // Run instruction specific decode
+                    self.fetch_instruction = match icreate {
+                        Err(e) => return Err(format!("Failed to determine type of \
+                                                      instruction for bits {}: {}",
+                                                     ibits, e)),
+                        Ok(v) => Some(v),
+                    };
+                    self.fetch_instruction_bits = ibits;
 
                     // Set state
                     self.cycle_count += wait as u32;
                 },
             };
         } else {
-            panic!("HALT");
             self.fetch_instruction = None;
         }
 
