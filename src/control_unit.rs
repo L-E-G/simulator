@@ -10,7 +10,7 @@ use crate::instructions::{Instruction,InstructionT,
     MemoryOp,AddrMode,Load,Store,
     ArithMode,ALUOp,Move,ArithSign,ArithUnsign,
     Comp,AS,LS,LogicType,ThreeOpLogic,Not,
-    ControlOp,Jump,SIH,INT,JOOI,
+    ControlOp,Jump,SIH,INT,
 };
 
 /// Responsible for running instructions.
@@ -373,14 +373,6 @@ impl ControlUnit {
                             Jump::new(AddrMode::RegisterDirect, true))),
                         Some(ControlOp::JmpSI) => Ok(Box::new(
                             Jump::new(AddrMode::Immediate, true))),
-                        Some(ControlOp::Sih) => Ok(Box::new(
-                            SIH::new())),
-                        Some(ControlOp::IntRD) => Ok(Box::new(
-                            INT::new(AddrMode::RegisterDirect))),
-                        Some(ControlOp::IntI) => Ok(Box::new(
-                            INT::new(AddrMode::Immediate))),
-                        Some(ControlOp::Ijmp) => Ok(Box::new(
-                            JOOI::new())),
                         _ => Err(format!("Invalid operation code {} for \
                                           Control type instruction", iop)),
                     }
@@ -431,11 +423,6 @@ impl ControlUnit {
                             ArithSign::new(AddrMode::RegisterDirect, ArithMode::Div))),
                         Some(ALUOp::DivSII) => Ok(Box::new(
                             ArithSign::new(AddrMode::Immediate, ArithMode::Div))),
-                        // ---- Comp ----
-                        Some(ALUOp::CompUI) => Ok(Box::new(
-                            Comp::new(false))),
-                        Some(ALUOp::CompSI) => Ok(Box::new(
-                            Comp::new(true))),
                         // ---- Arithmetic Shift ----
                         Some(ALUOp::ASLRD) => Ok(Box::new(
                             AS::new(AddrMode::RegisterDirect, false))),
