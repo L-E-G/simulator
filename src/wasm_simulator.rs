@@ -36,11 +36,28 @@ pub struct RunConfig {
     cache_enabled: bool,
 }
 
+/// All caches information.
+#[derive(Serialize,Deserialize)]
+pub struct CachesInfo {
+    l1: CacheInfo,
+    l2: CacheInfo,
+    l3: CacheInfo,
+}
+
+/// A single cache's values and aliases.
+#[derive(Serialize,Deserialize)]
+pub struct CacheInfo {
+    data: HashMap<u32, u32>,
+    aliases: HashMap<u32, String>,
+}
+
 /// Interface between JavaScript and all simulator functionality.
 /// The run configuration should be set before step() is ever called.
 #[wasm_bindgen]
 pub struct Simulator {
-    cache: Rc<RefCell<DMCache>>,
+    l1_cache: Rc<RefCell<DMCache>>,
+    l2_cache: Rc<RefCell<DMCache>>,
+    l3_cache: Rc<RefCell<DMCache>>,
     dram: Rc<RefCell<DRAM>>,
     control_unit: ControlUnit,
     assembler: Assembler,
@@ -62,12 +79,22 @@ impl Simulator {
         console_error_panic_hook::set_once();
 
         let dram = Rc::new(RefCell::new(DRAM::new(100)));
-        let cache = Rc::new(RefCell::new(DMCache::new(10, dram.clone())));
+        let l3_cache = Rc::new(RefCell::new(
+            DMCache::new(40, 512, dram.clone())
+        ));
+        let l2_cache = Rc::new(RefCell::new(
+            DMCache::new(10, 32, l3_cache.clone())
+        ));
+        let l1_cache = Rc::new(RefCell::new(
+            DMCache::new(1, 16, l2_cache.clone())
+        ));
 
         Simulator{
-            cache: cache.clone(),
+            l1_cache: l1_cache.clone(),
+            l2_cache: l2_cache.clone(),
+            l3_cache: l3_cache.clone(),
             dram: dram.clone(),
-            control_unit: ControlUnit::new(dram.clone(), cache.clone()),
+            control_unit: ControlUnit::new(dram.clone(), l1_cache.clone()),
             assembler: Assembler::new(),
             pipeline_statuses: vec![],
         }
@@ -153,7 +180,20 @@ impl Simulator {
 
     /// Returns the address and values in the cache.
     pub fn get_cache(&self) -> JsValue {
-        JsValue::from_serde(&self.cache.borrow().inspect_valid()).unwrap()
+        JsValue::from_serde(&CachesInfo{
+            l1: CacheInfo{
+                data: self.l1_cache.borrow().inspect_valid(),
+                aliases: self.l1_cache.borrow().inspect_valid_aliases(),
+            },
+            l2: CacheInfo{
+                data: self.l2_cache.borrow().inspect_valid(),
+                aliases: self.l2_cache.borrow().inspect_valid_aliases(),
+            },
+            l3: CacheInfo{
+                data: self.l3_cache.borrow().inspect_valid(),
+                aliases: self.l3_cache.borrow().inspect_valid_aliases(),
+            },
+        }).unwrap()
     }
 
     /// Returns addresses and values in DRAM. 
@@ -195,7 +235,6 @@ impl Simulator {
             Err(e) => Err(JsValue::from_serde(&e).unwrap()),
             Ok(done) => {
                 self.pipeline_statuses.insert(0, self.mk_pipeline_statuses());
-                console::log_1(&JsValue::from_serde(&format!("{}", self.control_unit)).unwrap());
 
                 Ok(JsValue::from_serde(&done).unwrap())
             }

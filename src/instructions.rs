@@ -733,7 +733,7 @@ impl ArithSign {
 
 impl Display for ArithSign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Arithmetic instruction signed")
+        write!(f, "{} signed", self.operation)
     }
 }
 
@@ -801,7 +801,7 @@ impl ArithUnsign {
 
 impl Display for ArithUnsign {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "Arithmetic instruction unsigned")
+        write!(f, "{} unsigned", self.operation)
     }
 }
 

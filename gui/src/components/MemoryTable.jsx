@@ -81,9 +81,11 @@ text-align: center;
 `;
 
 const MemoryTable = (props) => {
-    let title = props.title;
-    let memory = props.memory;
-    let keyAliases = props.keyAliases || {};
+    const title = props.title;
+    const memory = props.memory;
+    const keyAliases = props.keyAliases || {};
+    const addressesColName = props.addressesColName || "Addresses";
+    const highlightedAddress = props.highlightedAddress;
 
     const [expanded, setExpanded] = useState(true);
     
@@ -91,8 +93,6 @@ const MemoryTable = (props) => {
     const [searchAddrs, setSearchAddrs] = useState(true);
     const [searchVals, setSearchVals] = useState(false);
     const [searchFuzzy, setSearchFuzzy] = useState(true);
-
-    // TODO: Debug why search filter check boxes aren't setting
 
     // Toggle table
     const doToggleExpand = () => {
@@ -280,7 +280,7 @@ const MemoryTable = (props) => {
 		  <Table striped bordered>
 			 <thead>
 				<tr>
-				    <th>Address</th>
+				    <th>{addressesColName}</th>
 				    <th>
 					   <ValueHeader>
 						  <ValueHeaderLabel>{valueHeader}</ValueHeaderLabel>
@@ -313,9 +313,20 @@ const MemoryTable = (props) => {
 				    let key = addr + (addr in keyAliases ?
 								  " (" + keyAliases[addr] + ")" : "");
 				    let value = filteredMemory[i].value;
+
+				    var style = {};
+
+				    if (addr == highlightedAddress) {
+					   style = {
+						  background: "yellow",
+					   }
+				    }
 				    
 				    return (
-					   <tr key={addr}>
+					   <tr
+						  key={addr}
+						  style={style}
+					   >
 						  <td>{key}</td>
 						  <td>{value}</td>
 					   </tr>
@@ -328,7 +339,7 @@ const MemoryTable = (props) => {
 		   <EmptyMsgTxt>
 			  <h3>
 				 <Badge>
-					Memory empty
+					{title} empty
 				 </Badge>
 			  </h3>
 	        </EmptyMsgTxt>

@@ -338,9 +338,33 @@ const App = () => {
 							 memory={registers} />
 					   </Col>
 					   <Col>
-						  <MemoryTable title="DRAM" memory={dram} />
+						  <MemoryTable
+							 title="DRAM"
+							 memory={dram}
+							 highlightedAddress={registers[PC_REG_IDX]}
+						  />
 						  {runConfig.cache_enabled === true &&
-						  <MemoryTable title="Cache" memory={cache} />}
+						   <React.Fragment>
+							  <MemoryTable
+								 title="L1 Cache"
+								 memory={cache.l1.data}
+								 addressesColName="Lines (#line [tag] dirty)"
+								 keyAliases={cache.l1.aliases}
+							  />
+							  <MemoryTable
+								 title="L2 Cache"
+								 memory={cache.l2.data}
+								 addressesColName="Lines (#line [tag] dirty)"
+								 keyAliases={cache.l2.aliases}
+							  />
+							  <MemoryTable
+								 title="L3 Cache"
+								 memory={cache.l3.data}
+								 addressesColName="Lines (#line [tag] dirty)"
+								 keyAliases={cache.l3.aliases}
+							  />
+						   </React.Fragment>
+						  }
 					   </Col>
 				    </Row>
 				</MemoryContainer>

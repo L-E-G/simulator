@@ -1,5 +1,7 @@
 use bit_field::BitField;
-use wasm_bindgen::prelude::*;
+
+use web_sys::console;
+use wasm_bindgen::JsValue;
 
 use std::boxed::Box;
 use std::fmt;
@@ -265,6 +267,10 @@ impl ControlUnit {
         match &mut self.execute_instruction {
             None => self.access_mem_instruction = None,
             Some(exec_inst) => {
+                console::log_1(&JsValue::from_serde(
+                    &format!("control unit access memory stage")
+                ).unwrap());
+                
                 match exec_inst.access_memory(memory.clone()) {
                     SimResult::Err(e) => return Err(
                         format!("Failed to access memory for instruction: {}",
@@ -317,11 +323,17 @@ impl ControlUnit {
     
         // Fetch stage
         if !self.halt_encountered {
+            console::log_1(&JsValue::from_serde(
+                &format!("fetching {}", self.registers[PC])
+            ).unwrap());
             match memory.clone().borrow_mut().get(self.registers[PC]) {
                 SimResult::Err(e) => return Err(
                     format!("Failed to retrieve instruction from address {}: {}",
                             self.registers[PC], e)),
                 SimResult::Wait(wait, ibits) => {
+                    console::log_1(&JsValue::from_serde(
+                        &format!("fetched {} = {}", self.registers[PC], ibits)
+                    ).unwrap());
                     // Figure out which instruction the bits represent by
                     // looking at the type and operation code.
                     let icreate = self.instruction_factory(ibits);
