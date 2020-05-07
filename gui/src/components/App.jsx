@@ -339,7 +339,8 @@ const App = () => {
 					   </Col>
 					   <Col>
 						  <MemoryTable title="DRAM" memory={dram} />
-						  <MemoryTable title="Cache" memory={cache} />
+						  {runConfig.cache_enabled === true &&
+						  <MemoryTable title="Cache" memory={cache} />}
 					   </Col>
 				    </Row>
 				</MemoryContainer>
