@@ -308,6 +308,24 @@ impl DMCache {
     fn get_address_tag(&self, address: u32) -> u32 {
         address >> 10
     }
+
+    pub fn inspect_valid(&self) -> HashMap<u32, u32> {
+        let mut map: HashMap<u32, u32> = HashMap::new();
+
+        for i in 0..DM_CACHE_LINES {
+            let line = self.lines[i];
+
+            if !line.valid {
+                continue
+            }
+            
+            let addr: u32 = ((i as u32) << 22) | line.tag;
+
+            map.insert(addr, line.data);
+        }
+
+        map
+    }
 }
 
 impl InspectableMemory<u32, u32> for DMCache {

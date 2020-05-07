@@ -234,6 +234,7 @@ impl ControlUnit {
         // Update state
         self.no_pipeline_instruction = Some(no_pipeline_inst);
         self.registers[PC] += 1;
+        self.cycle_count += 5;
 
         // Determine if program should continue running
         Ok(self.program_is_running())
@@ -343,6 +344,7 @@ impl ControlUnit {
 
         // Update state after all stages
         self.registers[PC] += 1;
+        self.cycle_count += 1;
 
         // Determine if program should continue running
         Ok(self.program_is_running())

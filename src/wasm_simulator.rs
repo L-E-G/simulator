@@ -151,9 +151,12 @@ impl Simulator {
         self.control_unit.cache_enabled = run_config.cache_enabled;
     }
 
-    /// Returns addresses and values in DRAM. First returned value is a list of
-    /// addresses. Second returned value is a list of values corresponding to
-    /// the addresses.
+    /// Returns the address and values in the cache.
+    pub fn get_cache(&self) -> JsValue {
+        JsValue::from_serde(&self.cache.borrow().inspect_valid()).unwrap()
+    }
+
+    /// Returns addresses and values in DRAM. 
     pub fn get_dram(&self) -> JsValue {
         JsValue::from_serde(&self.dram.borrow().inspect()).unwrap()
     }

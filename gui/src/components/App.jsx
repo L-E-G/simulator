@@ -134,14 +134,15 @@ class GUISimulator {
     /**
      * @param {Simulator} simulator - Base simulator instance
 	* @param {Object} stateSetters - React hook state setters, keys are: 
-	*     setRunConfig, setRegisters, setDRAM, setPipelines, setCycleCount,
-	*     setProgramStatus.
+	*     setRunConfig, setRegisters, setCache, setDRAM, setPipelines,
+	*     setCycleCount, setProgramStatus.
      */
     constructor(simulator, stateSetters) {
 	   this.simulator = simulator;
 
 	   this.setRunConfig = stateSetters.setRunConfig;
 	   this.setRegisters = stateSetters.setRegisters;
+	   this.setCache = stateSetters.setCache;
 	   this.setDRAM = stateSetters.setDRAM;
 	   this.setPipelines = stateSetters.setPipelines;
 	   this.setCycleCount = stateSetters.setCycleCount;
@@ -178,6 +179,7 @@ class GUISimulator {
 	   }
 	   
 	   this.setRegisters(this.simulator.get_registers());
+	   this.setCache(this.simulator.get_cache());
 	   this.setDRAM(this.simulator.get_dram());
 	   this.setPipelines(this.simulator.get_pipelines());
 	   this.setCycleCount(this.simulator.get_cycle_count());
@@ -187,6 +189,7 @@ class GUISimulator {
 	   this.simulator.finish_program();
 
 	   this.setRegisters(this.simulator.get_registers());
+	   this.setCache(this.simulator.get_cache());
 	   this.setDRAM(this.simulator.get_dram());
 	   this.setPipelines(this.simulator.get_pipelines());
 	   this.setCycleCount(this.simulator.get_cycle_count());
@@ -200,6 +203,7 @@ var simulator = new Simulator();
 const App = () => {
     const [runConfig, setRunConfig] = useState(simulator.get_run_config());
     const [registers, setRegisters] = useState(simulator.get_registers());
+    const [cache, setCache] = useState(simulator.get_cache());
     const [dram, setDRAM] = useState(simulator.get_dram());
     const [pipelines, setPipelines] = useState(simulator.get_pipelines());
     const [cycleCount, setCycleCount] = useState(simulator.get_cycle_count());
@@ -208,6 +212,7 @@ const App = () => {
 
     var guiSimulator = new GUISimulator(simulator, { setRunConfig,
 										   setRegisters,
+										   setCache,
 										   setDRAM,
 										   setPipelines,
 										   setCycleCount,
@@ -334,6 +339,7 @@ const App = () => {
 					   </Col>
 					   <Col>
 						  <MemoryTable title="DRAM" memory={dram} />
+						  <MemoryTable title="Cache" memory={cache} />
 					   </Col>
 				    </Row>
 				</MemoryContainer>
