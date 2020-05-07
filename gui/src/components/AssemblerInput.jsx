@@ -7,12 +7,14 @@ import Spinner from "react-bootstrap/Spinner";
 import ToggleCard from "./ToggleCard";
 import { PrimaryButton } from "./styled";
 import { ErrorContext, SimulatorContext } from "./App";
-import CheckInput from "./CheckInput";
-import { SHOULD_USE_MEM_FILE_KEY, STORED_MEM_FILE_KEY } from "./UploadMemFileForm";
+//import CheckInput from "./CheckInput";
+//import { SHOULD_USE_MEM_FILE_KEY, STORED_MEM_FILE_KEY } from "./UploadMemFileForm";
 
+/*
 const LoadSameCheck = styled(CheckInput)`
 margin-top: 1rem;
 `;
+*/
 
 const SubmitButton = styled(PrimaryButton)`
 margin-top: 1rem;
@@ -24,16 +26,18 @@ const AssemblerInput = () => {
     
     const [assembleText, setAssembleText] = useState("");
     const [loading, setLoading] = useState(false);
-    const [loadSame, setLoadSame] = useState(
-	   localStorage.getItem(SHOULD_USE_MEM_FILE_KEY) === "true");
+    /*const [loadSame, setLoadSame] = useState(
+	   localStorage.getItem(SHOULD_USE_MEM_FILE_KEY) === "true");*/
 
     const onAssembleTextChange = (e) => {
 	   setAssembleText(e.target.value);
     };
 
+    /*
     const onLoadSameClick = () => {
 	   setLoadSame(!loadSame);
     }
+    */
 
     const onSubmitClick = () => {
 	   setLoading(true);
@@ -41,6 +45,7 @@ const AssemblerInput = () => {
 	   try {
 		  guiSimulator.set_dram_assembled(assembleText);
 
+		  /*
 		  if (loadSame === true) {
 			 localStorage.setItem(SHOULD_USE_MEM_FILE_KEY, true);
 			 let dram = guiSimulator.simulator.get_dram();
@@ -52,6 +57,7 @@ const AssemblerInput = () => {
 			 
 			 localStorage.setItem(STORED_MEM_FILE_KEY, dramArr);
 		  }
+		  */
 	   } catch (e) {
 		  setError(e);
 	   }

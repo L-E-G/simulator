@@ -85,7 +85,8 @@ const MemoryTable = (props) => {
     const memory = props.memory;
     const keyAliases = props.keyAliases || {};
     const addressesColName = props.addressesColName || "Addresses";
-    const highlightedAddress = props.highlightedAddress;
+    const highlightedAddress = props.highlightedAddress ?
+						 Number(props.highlightedAddress) : null;
 
     const [expanded, setExpanded] = useState(true);
     
@@ -316,7 +317,7 @@ const MemoryTable = (props) => {
 
 				    var style = {};
 
-				    if (addr == highlightedAddress) {
+				    if (addr === highlightedAddress) {
 					   style = {
 						  background: "yellow",
 					   }
