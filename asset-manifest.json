@@ -1,20 +1,20 @@
 {
   "files": {
-    "main.js": "https://l-e-g.github.io/simulator/static/js/main.13bab3c4.chunk.js",
-    "main.js.map": "https://l-e-g.github.io/simulator/static/js/main.13bab3c4.chunk.js.map",
-    "runtime-main.js": "https://l-e-g.github.io/simulator/static/js/runtime-main.07a09157.js",
-    "runtime-main.js.map": "https://l-e-g.github.io/simulator/static/js/runtime-main.07a09157.js.map",
+    "main.js": "https://l-e-g.github.io/simulator/static/js/main.7cb5394b.chunk.js",
+    "main.js.map": "https://l-e-g.github.io/simulator/static/js/main.7cb5394b.chunk.js.map",
+    "runtime-main.js": "https://l-e-g.github.io/simulator/static/js/runtime-main.ea58b491.js",
+    "runtime-main.js.map": "https://l-e-g.github.io/simulator/static/js/runtime-main.ea58b491.js.map",
     "static/css/2.69121389.chunk.css": "https://l-e-g.github.io/simulator/static/css/2.69121389.chunk.css",
-    "static/js/2.11d1d975.chunk.js": "https://l-e-g.github.io/simulator/static/js/2.11d1d975.chunk.js",
-    "static/js/2.11d1d975.chunk.js.map": "https://l-e-g.github.io/simulator/static/js/2.11d1d975.chunk.js.map",
-    "static/js/3.ce75c13e.chunk.js": "https://l-e-g.github.io/simulator/static/js/3.ce75c13e.chunk.js",
-    "0207823fb1f12b96320b.module.wasm": "https://l-e-g.github.io/simulator/0207823fb1f12b96320b.module.wasm",
-    "static/js/3.ce75c13e.chunk.js.map": "https://l-e-g.github.io/simulator/static/js/3.ce75c13e.chunk.js.map",
+    "static/js/2.b9fcd55b.chunk.js": "https://l-e-g.github.io/simulator/static/js/2.b9fcd55b.chunk.js",
+    "static/js/2.b9fcd55b.chunk.js.map": "https://l-e-g.github.io/simulator/static/js/2.b9fcd55b.chunk.js.map",
+    "static/js/3.d76b3191.chunk.js": "https://l-e-g.github.io/simulator/static/js/3.d76b3191.chunk.js",
+    "2fd5dc6877384fbb727b.module.wasm": "https://l-e-g.github.io/simulator/2fd5dc6877384fbb727b.module.wasm",
+    "static/js/3.d76b3191.chunk.js.map": "https://l-e-g.github.io/simulator/static/js/3.d76b3191.chunk.js.map",
     "index.html": "https://l-e-g.github.io/simulator/index.html",
-    "precache-manifest.f58546aaefce0f79754678d052a42b33.js": "https://l-e-g.github.io/simulator/precache-manifest.f58546aaefce0f79754678d052a42b33.js",
+    "precache-manifest.b80a19c535d51e4b0c8264c31f9b3ae7.js": "https://l-e-g.github.io/simulator/precache-manifest.b80a19c535d51e4b0c8264c31f9b3ae7.js",
     "service-worker.js": "https://l-e-g.github.io/simulator/service-worker.js",
     "static/css/2.69121389.chunk.css.map": "https://l-e-g.github.io/simulator/static/css/2.69121389.chunk.css.map",
-    "static/js/2.11d1d975.chunk.js.LICENSE.txt": "https://l-e-g.github.io/simulator/static/js/2.11d1d975.chunk.js.LICENSE.txt",
+    "static/js/2.b9fcd55b.chunk.js.LICENSE.txt": "https://l-e-g.github.io/simulator/static/js/2.b9fcd55b.chunk.js.LICENSE.txt",
     "static/media/load-custom-file.png": "https://l-e-g.github.io/simulator/static/media/load-custom-file.194e97c9.png",
     "static/media/load-example-file.png": "https://l-e-g.github.io/simulator/static/media/load-example-file.ff5ac561.png",
     "static/media/logo.png": "https://l-e-g.github.io/simulator/static/media/logo.fb300e90.png",
@@ -22,7 +22,7 @@
     "static/media/memory-value-format.png": "https://l-e-g.github.io/simulator/static/media/memory-value-format.2508aa0c.png"
   },
   "entrypoints": [
-    "static/js/runtime-main.07a09157.js",
-    "static/js/main.13bab3c4.chunk.js"
+    "static/js/runtime-main.ea58b491.js",
+    "static/js/main.7cb5394b.chunk.js"
   ]
 }
