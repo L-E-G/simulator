@@ -62,12 +62,12 @@ impl Simulator {
         console_error_panic_hook::set_once();
 
         let dram = Rc::new(RefCell::new(DRAM::new(100)));
-        let cache = Rc::new(RefCell::new(DMCache::new(10, dram)));
+        let cache = Rc::new(RefCell::new(DMCache::new(10, dram.clone())));
 
         Simulator{
-            cache: cache,
-            dram: dram,
-            control_unit: ControlUnit::new(cache),
+            cache: cache.clone(),
+            dram: dram.clone(),
+            control_unit: ControlUnit::new(dram.clone(), cache.clone()),
             assembler: Assembler::new(),
             pipeline_statuses: vec![],
         }

@@ -30,7 +30,14 @@ const RunConfig = (props) => {
 	   guiSimulator.set_run_config({
 		  ...runConfig,
 		  pipeline_enabled: !runConfig.pipeline_enabled,
-	   })
+	   });
+    };
+
+    const onCacheEnabledClick = () => {
+	   guiSimulator.set_run_config({
+		  ...runConfig,
+		  cache_enabled: !runConfig.cache_enabled,
+	   });
     };
 
     return (
@@ -45,6 +52,13 @@ const RunConfig = (props) => {
 			 value={runConfig.pipeline_enabled}
 			 onClick={onPipelineEnabledClick}
 			 label="Use Pipeline"
+			 disabled={notRunning === false}
+		  />
+
+		  <ConfigCheckInput
+			 value={runConfig.cache_enabled}
+			 onClick={onCacheEnabledClick}
+			 label="Use Cache"
 			 disabled={notRunning === false}
 		  />
 	   </RunConfigCard>

@@ -30,7 +30,8 @@ pub struct ControlUnit {
     pub registers: Registers,
 
     /// Memory system.
-    pub memory: Rc<RefCell<DMCache>>,
+    pub dram: Rc<RefCell<dyn Memory<u32, u32>>>,
+    pub cache: Rc<RefCell<dyn Memory<u32, u32>>>,
 
     /// Indicates that the processor has loaded the first instruction yet.
     pub first_instruction_loaded: bool,
@@ -106,24 +107,23 @@ Halted     : {}
 Cycle Count: {}
 Registers  :
 {}
-Memory     :
-{}
 {}",
                self.pipeline_enabled, self.cache_enabled, self.halt_encountered,
                self.cycle_count, indent(format!("{}", self.registers)),
-               indent(format!("{}", self.memory)), instructions_str)
+               instructions_str)
     }
 }
 
 impl ControlUnit {
     /// Creates a new ControlUnit.
-    pub fn new(memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> ControlUnit {
+    pub fn new(dram: Rc<RefCell<dyn Memory<u32, u32>>>, cache: Rc<RefCell<dyn Memory<u32, u32>>>) -> ControlUnit {
         ControlUnit{
             pipeline_enabled: true,
             cache_enabled: true,
             cycle_count: 0,
             registers: Registers::new(),
-            memory: memory,
+            dram: dram,
+            cache: cache,
             first_instruction_loaded: false,
             halt_encountered: false,
             no_pipeline_instruction: None,
@@ -135,29 +135,28 @@ impl ControlUnit {
             write_back_instruction: None,
         }
     }
-
-    /// Loads a memory file into the control unit's memory. See
-    /// DRAM::load_from_file() for details on the expected file structure.
-    pub fn load_memory_from_file(&mut self, f: &str) -> Result<(), String> {
-        self.memory.base.load_from_file(f)
-    }
-
+    
     /// Step one instruction through the processor. Stores resulting state in self.
     /// If Result::Ok is returned the value embedded indicates if the program
     /// should keep running. False indicates it should not.
     pub fn step(&mut self) -> Result<bool, String> {
         self.first_instruction_loaded = true;
 
+        let memory = match self.cache_enabled {
+            true => self.cache.clone(),
+            false => self.dram.clone(),
+        };
+
         if self.pipeline_enabled {
-            self.step_pipeline()
+            self.step_pipeline(memory)
         } else {
-            self.step_no_pipeline()
+            self.step_no_pipeline(memory)
         }
     }
 
     /// Step one instruction through the processor without a pipeline. See step()
     /// for return documentation.
-    pub fn step_no_pipeline(&mut self) -> Result<bool, String> {
+    pub fn step_no_pipeline(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> Result<bool, String> {
         if self.halt_encountered {
             return Ok(false);
         }
@@ -165,7 +164,7 @@ impl ControlUnit {
         // Fetch instruction
         let mut ibits: u32 = 0;
 
-        let mut no_pipeline_inst = match self.memory.get(self.registers[PC]) {
+        let mut no_pipeline_inst = match memory.clone().borrow_mut().get(self.registers[PC]) {
             SimResult::Err(e) => return Err(
                 format!("Failed to retrieve instruction from address {}: {}",
                         self.registers[PC], e)),
@@ -211,7 +210,7 @@ impl ControlUnit {
         };
 
         // Access memory
-        match no_pipeline_inst.access_memory(&mut self.memory) {
+        match no_pipeline_inst.access_memory(memory.clone()) {
             SimResult::Err(e) => return Err(
                 format!("Failed to access memory for instruction: {}",
                         e)),
@@ -242,7 +241,7 @@ impl ControlUnit {
 
     /// Step one instruction through the processor using the pipeline. See step()
     /// for return documentation.
-    pub fn step_pipeline(&mut self) -> Result<bool, String> {
+    pub fn step_pipeline(&mut self, memory: Rc<RefCell<dyn Memory<u32, u32>>>) -> Result<bool, String> {
         //  Write back stage
         match &mut self.access_mem_instruction {
             None => self.write_back_instruction = None,
@@ -265,7 +264,7 @@ impl ControlUnit {
         match &mut self.execute_instruction {
             None => self.access_mem_instruction = None,
             Some(exec_inst) => {
-                match exec_inst.access_memory(self.memory.borrow_mut()) {
+                match exec_inst.access_memory(memory.clone()) {
                     SimResult::Err(e) => return Err(
                         format!("Failed to access memory for instruction: {}",
                                 e)),
@@ -317,7 +316,7 @@ impl ControlUnit {
     
         // Fetch stage
         if !self.halt_encountered {
-            match self.memory.borrow().get(self.registers[PC]) {
+            match memory.clone().borrow_mut().get(self.registers[PC]) {
                 SimResult::Err(e) => return Err(
                     format!("Failed to retrieve instruction from address {}: {}",
                             self.registers[PC], e)),

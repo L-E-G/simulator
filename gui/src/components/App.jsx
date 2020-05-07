@@ -198,10 +198,7 @@ class GUISimulator {
 var simulator = new Simulator();
 
 const App = () => {
-    const [runConfig, setRunConfig] = useState({
-	   pipeline_enabled: true,
-	   cache_enabled: false,
-    });
+    const [runConfig, setRunConfig] = useState(simulator.get_run_config());
     const [registers, setRegisters] = useState(simulator.get_registers());
     const [dram, setDRAM] = useState(simulator.get_dram());
     const [pipelines, setPipelines] = useState(simulator.get_pipelines());
