@@ -9,7 +9,6 @@ import Form from "react-bootstrap/Form";
 import Spinner from "react-bootstrap/Spinner";
 
 import { SimulatorContext, ErrorContext } from "./App.jsx";
-import ToggleExpandButton from "./ToggleExpandButton.jsx";
 import CheckInput from "./CheckInput";
 import { PrimaryButton } from "./styled";
 import ToggleCard from "./ToggleCard";
@@ -17,7 +16,7 @@ import ToggleCard from "./ToggleCard";
 import { colors } from "../styles";
 
 const UploadCard = styled(ToggleCard)`
-max-width: 32rem;
+width: 32rem;
 `;
 
 const ExampleSelectCol = styled(Col)`
@@ -73,7 +72,6 @@ const UploadMemFileForm = (props) => {
     const simulator = useContext(SimulatorContext);
     const setError = useContext(ErrorContext)[1];
 
-    const [expanded, setExpanded] = useState(true);
     const [fileLoading, setFileLoading] = useState(false);
     const [fileSelected, setFileSelected] = useState(false);
     const [useSameFile, setUseSameFile] = useState(
@@ -96,7 +94,6 @@ const UploadMemFileForm = (props) => {
 
 				simulator.set_dram(new Uint8Array(arr));
 				
-				setExpanded(false);
 				setFileSelected(true);
 			 } catch (e) {
 				setError(e);
@@ -117,7 +114,6 @@ const UploadMemFileForm = (props) => {
 		  }
 
 		  setFileLoading(false);
-		  setExpanded(false);
 	   } catch(e) {
 		  setError(e);
 		  setFileSelected(false);
@@ -151,7 +147,6 @@ const UploadMemFileForm = (props) => {
 		  }
 
 		  setFileLoading(false);
-		  setExpanded(false);
 	   } catch(e) {
 		  setError(e);
 		  setFileSelected(false);
@@ -236,10 +231,6 @@ const UploadMemFileForm = (props) => {
 	   }
     };
 
-    const doToggleExpand = () => {
-	   setExpanded(!expanded);
-    };
-
     return (
 	   <UploadCard
 		  title="Memory File"
@@ -251,3 +242,4 @@ const UploadMemFileForm = (props) => {
 };
 
 export default UploadMemFileForm;
+export { SHOULD_USE_MEM_FILE_KEY, STORED_MEM_FILE_KEY };

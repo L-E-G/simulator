@@ -16,6 +16,10 @@ padding-bottom: 1.6rem;
 const ToggleExpandButton = (props) => {
     let expanded = props.expanded;
     let doToggleExpand = props.doToggleExpand;
+
+    var _props = {...props};
+    delete _props.expanded;
+    delete _props.doToggleExpand;
     
     var txt = "▲";
 
@@ -25,7 +29,7 @@ const ToggleExpandButton = (props) => {
     
     return (
 	   <ToggleButton
-		  className={props.className}
+		  {..._props}
 		  variant="outline-primary"
 		  onClick={doToggleExpand}>
 		  {txt}

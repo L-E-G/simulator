@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useContext } from "react";
 import styled from "styled-components";
 
 import ToggleCard from "./ToggleCard";
@@ -7,7 +7,7 @@ import CheckInput from "./CheckInput";
 import { SimulatorContext, PROG_STATUS_NOT_RUNNING } from "./App";
 
 const RunConfigCard = styled(ToggleCard)`
-max-width: 16rem;
+max-width: 18rem;
 `;
 
 const ConfigCheckInput = styled(CheckInput)`

@@ -23,6 +23,7 @@ import MemoryTable from "./MemoryTable.jsx";
 import UploadMemFileForm from "./UploadMemFileForm.jsx";
 import PipelineDisplay from "./PipelineDisplay.jsx";
 import RunConfig from "./RunConfig";
+import AssemblerInput from "./AssemblerInput";
 import Help from "./Help";
 import Error from "./Error";
 
@@ -147,6 +148,11 @@ class GUISimulator {
 	   this.setProgramStatus = stateSetters.setProgramStatus;
     }
 
+    set_dram_assembled(v) {
+	   this.simulator.set_dram_assembled(v);
+	   this.setDRAM(this.simulator.get_dram());
+    }
+
     set_run_config(c) {
 	   this.simulator.set_run_config(c);
 	   this.setRunConfig(this.simulator.get_run_config());
@@ -219,7 +225,11 @@ const App = () => {
     };
 
     const onRunClick = () => {
-	   guiSimulator.finish_program();
+	   try {
+		  guiSimulator.finish_program();
+	   } catch (e) {
+		  setError(e);
+	   }
     };
 
     var programStatusImg = null;
@@ -304,6 +314,10 @@ const App = () => {
 							 programStatus={programStatus}
 							 runConfig={runConfig}
 						  />
+					   </Col>
+
+					   <Col>
+						  <AssemblerInput />
 					   </Col>
 				    </Row>
 				</Container>

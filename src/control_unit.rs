@@ -7,10 +7,10 @@ use std::fmt;
 use crate::result::SimResult;
 use crate::memory::{Memory,DRAM,Registers,PC};
 use crate::instructions::{Instruction,InstructionT,
-    MemoryOp,AddrMode,Load,Store,
+    MemoryOp,AddrMode,Load,Store,Push,Pop,
     ArithMode,ALUOp,Move,ArithSign,ArithUnsign,
     Comp,AS,LS,LogicType,ThreeOpLogic,Not,
-    ControlOp,Jump,SIH,INT,
+    ControlOp,Jump,SIH,INT,RFI,Halt,Noop
 };
 
 /// Responsible for running instructions.
@@ -32,6 +32,10 @@ pub struct ControlUnit {
 
     /// Indicates that the processor has loaded the first instruction yet.
     pub first_instruction_loaded: bool,
+
+    /// Indicates that a halt instruction was loaded and no more
+    /// instructions should be fetched from memory.
+    pub halt_encountered: bool,
 
     /// If control unit in no pipeline mode this stores the instruction which was
     /// just executed. Otherwise instructions are stored by stage in the following
@@ -93,14 +97,15 @@ Instruction : {:?}", self.no_pipeline_instruction),
         write!(f, "\
 Pipeline   : {}
 Cache      : {}
+Halted     : {}
 Cycle Count: {}
 Registers  :
 {}
 Memory     :
 {}
 {}",
-               self.pipeline_enabled, self.cache_enabled, self.cycle_count,
-               indent(format!("{}", self.registers)),
+               self.pipeline_enabled, self.cache_enabled, self.halt_encountered,
+               self.cycle_count, indent(format!("{}", self.registers)),
                indent(format!("{}", self.memory)), instructions_str)
     }
 }
@@ -115,6 +120,7 @@ impl ControlUnit {
             registers: Registers::new(),
             memory: DRAM::new(100),
             first_instruction_loaded: false,
+            halt_encountered: false,
             no_pipeline_instruction: None,
             fetch_instruction: None,            
             decode_instruction: None,
@@ -145,7 +151,11 @@ impl ControlUnit {
 
     /// Step one instruction through the processor without a pipeline. See step()
     /// for return documentation.
-    pub fn step_no_pipeline(&mut self) -> Result<bool, String> {        
+    pub fn step_no_pipeline(&mut self) -> Result<bool, String> {
+        if self.halt_encountered {
+            return Ok(false);
+        }
+        
         // Fetch instruction
         let mut ibits: u32 = 0;
         
@@ -314,22 +324,27 @@ impl ControlUnit {
         };
         
         // Fetch stage
-        match self.memory.get(self.registers[PC]) {
-            SimResult::Err(e) => return Err(
-                format!("Failed to retrieve instruction from address {}: {}",
-                        self.registers[PC], e)),
-            SimResult::Wait(wait, ibits) => {
-                // End program execution if instruction is 0
-                if ibits == 0 {
-                    self.fetch_instruction = None;
-                } else {
-                    self.fetch_instruction = Some(ibits);
-                }
+        if !self.halt_encountered {
+            match self.memory.get(self.registers[PC]) {
+                SimResult::Err(e) => return Err(
+                    format!("Failed to retrieve instruction from address {}: {}",
+                            self.registers[PC], e)),
+                SimResult::Wait(wait, ibits) => {
+                    // End program execution if instruction is 0
+                    if ibits == 0 {
+                        self.fetch_instruction = None;
+                    } else {
+                        self.fetch_instruction = Some(ibits);
+                    }
 
-                // Set state
-                self.cycle_count += wait as u32;
-            },
-        };
+                    // Set state
+                    self.cycle_count += wait as u32;
+                },
+            };
+        } else {
+            panic!("HALT");
+            self.fetch_instruction = None;
+        }
 
         // Update state after all stages
         self.registers[PC] += 1;
@@ -339,7 +354,7 @@ impl ControlUnit {
     }
 
     /// Initializes an instruction data structure based on instruction bits.
-    fn instruction_factory(&self, ibits: u32) ->
+    fn instruction_factory(&mut self, ibits: u32) ->
         Result<Box<dyn Instruction>, String> {
             let itype = ibits.get_bits(5..=6) as u32;
             
@@ -357,14 +372,25 @@ impl ControlUnit {
                             Store::new(AddrMode::RegisterDirect))),
                         Some(MemoryOp::StoreI) => Ok(Box::new(
                             Store::new(AddrMode::Immediate))),
+                        Some(MemoryOp::Push) => Ok(Box::new(
+                            Push::new())),
+                        Some(MemoryOp::Pop) => Ok(Box::new(
+                            Pop::new())),
                         _ => Err(format!("Invalid operation code {} for \
                                           mememory type instruction", iop)),
                     }
                 },
 
+                // Subrouting/notsub
+                // Sub = true
+                // notsub = false
                 Some(InstructionT::Control) => {
                     let iop = ibits.get_bits(7..=9) as u32;
                     match ControlOp::match_val(iop) {
+                        Some(ControlOp::Halt) => {
+                            self.halt_encountered = true;
+                            Ok(Box::new(Halt::new()))
+                        },
                         Some(ControlOp::JmpRD) => Ok(Box::new(
                             Jump::new(AddrMode::RegisterDirect, false))),
                         Some(ControlOp::JmpI) => Ok(Box::new(
@@ -373,12 +399,22 @@ impl ControlUnit {
                             Jump::new(AddrMode::RegisterDirect, true))),
                         Some(ControlOp::JmpSI) => Ok(Box::new(
                             Jump::new(AddrMode::Immediate, true))),
+                        // Some(ControlOp::Sih) => Ok(Box::new(
+                        //     SIH::new())),
+                        // Some(ControlOp::IntRD) => Ok(Box::new(
+                        //     INT::new(AddrMode::RegisterDirect))),
+                        // Some(ControlOp::IntI) => Ok(Box::new(
+                        //     INT::new(AddrMode::Immediate))),
+                        Some(ControlOp::RFI) => Ok(Box::new(
+                            RFI::new())),
+                        Some(ControlOp::Noop) => Ok(Box::new(
+                            Noop::new())),
                         _ => Err(format!("Invalid operation code {} for \
                                           Control type instruction", iop)),
                     }
                 }
 
-                // Immediates:
+                // sign/unsign:
                 // Unsigned = false
                 // Signed = true
                 Some(InstructionT::ALU) => {
@@ -423,6 +459,9 @@ impl ControlUnit {
                             ArithSign::new(AddrMode::RegisterDirect, ArithMode::Div))),
                         Some(ALUOp::DivSII) => Ok(Box::new(
                             ArithSign::new(AddrMode::Immediate, ArithMode::Div))),
+                        // ---- Comp ----
+                        Some(ALUOp::Comp) => Ok(Box::new(
+                            Comp::new())),
                         // ---- Arithmetic Shift ----
                         Some(ALUOp::ASLRD) => Ok(Box::new(
                             AS::new(AddrMode::RegisterDirect, false))),

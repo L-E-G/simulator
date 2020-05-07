@@ -13,8 +13,12 @@ margin: 1rem;
 }
 `;
 
-const CardExpandButton = styled(ToggleExpandButton)`
-float: right;
+const CardTitle = styled(Card.Title)`
+display: flex;
+`;
+
+const CardTitleText = styled.span`
+flex-grow: 1;
 `;
 
 const Children = styled.div`
@@ -46,13 +50,13 @@ const ToggleCard = (props) => {
     return (
 	   <StyledCard {..._props}>
 		  <Card.Body>
-			 <Card.Title>
-				<span>{title}</span>
+			 <CardTitle>
+				<CardTitleText>{title}</CardTitleText>
 
-				<CardExpandButton
+				<ToggleExpandButton
 				    expanded={expanded}
 				    doToggleExpand={doToggleExpand}/>
-			 </Card.Title>
+			 </CardTitle>
 
 			 {expanded &&
 			  <Children>{children}</Children>}

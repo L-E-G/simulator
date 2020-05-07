@@ -182,9 +182,14 @@ impl DRAM {
                     if bytes_read == 0 { // End of file
                         return Ok(());
                     } else if bytes_read != 4 { // Incorrect number of bytes read
-                        return Err(format!("Read {} bytes from buffer but \
-                                            expected 4 bytes",
-                                           bytes_read));
+                        let mut read_as: Vec<String> = Vec::new();
+                        for i in 0..bytes_read {
+                            read_as.push(buf[i].to_string());
+                        }
+                        return Err(format!("Read {} bytes as {:?} from buffer but \
+                                            expected 4 bytes, after reading {} \
+                                            words successfuly",
+                                           bytes_read, read_as, self.data.len()));
                     }
 
                     let value: u32 = (buf[3] as u32) |

@@ -1,4 +1,4 @@
-import React, { useState, useContext } from "react";
+import React, { useState } from "react";
 
 import styled from "styled-components";
 
@@ -6,7 +6,6 @@ import Table from "react-bootstrap/Table";
 
 import { Badge } from "./styled";
 import CheckInput from "./CheckInput";
-import { SimulatorContext } from "./App";
 
 const PipelineDiv = styled.div`
 margin-left: 1rem;
@@ -43,8 +42,6 @@ const PIPELINE_DISABLED_HEADERS = (
 );
 
 const PipelineDisplay = ({pipelineStatuses, runConfig}) => {
-    const guiSimulator = useContext(SimulatorContext);
-    
     let storedCurrentRecentOnly = localStorage.getItem(RECENT_ONLY_KEY) ||
 						   "true";
     const [recentOnly, setRecentOnly] = useState(
